@@ -4,13 +4,17 @@ using EasyImageImporter.Core.Review;
 namespace EasyImageImporter.Core.Tests;
 
 /// <summary>
-/// Scores visit grouping against real camera-trap images with known answers (built by
+/// Checks visit grouping against real camera-trap images with known answers (built by
 /// tools/testdata/build_cards.py into testdata/, which is not in git). Skipped when absent, e.g. on CI.
+///
+/// The datasets' "sequences" are single camera triggers (a burst of frames within a second or two),
+/// while a visit is one animal's visit and deliberately spans several triggers. So the checks are:
+/// a trigger burst is never split, and two different animals are never merged into one visit.
 /// </summary>
 public sealed class RealCardTests
 {
     private sealed record Expected(string Card, List<ExpectedFile> Files);
-    private sealed record ExpectedFile(string Path, string Sequence, string? Site);
+    private sealed record ExpectedFile(string Path, string? Sequence, string? Site, List<string>? Species);
 
     private static readonly JsonSerializerOptions Json = new() { PropertyNameCaseInsensitive = true };
 
@@ -30,11 +34,13 @@ public sealed class RealCardTests
         Assert.SkipWhen(dir is null, "No generated test cards; run tools/testdata/build_cards.py");
 
         var expected = JsonSerializer.Deserialize<Expected>(File.ReadAllText(Path.Combine(dir!, "expected.json")), Json)!;
+        Assert.SkipWhen(expected.Files.Any(f => f.Sequence is null), $"{card} has no sequence ground truth");
         var files = expected.Files.Select((f, i) =>
         {
             var path = Path.Combine(dir!, f.Path);
             var info = MediaInfoReader.Read(path, File.GetLastWriteTimeUtc(path), path);
-            return (Id: (long)i, Truth: f.Sequence, Input: new SequenceInput(i, info.TakenAt!.Value, info.Camera, f.Path));
+            return (Id: (long)i, Truth: f.Sequence!, Species: f.Species ?? [],
+                Input: new SequenceInput(i, info.TakenAt!.Value, info.Camera, f.Path));
         }).ToList();
 
         var predicted = new Dictionary<long, int>();
@@ -42,29 +48,38 @@ public sealed class RealCardTests
         for (var v = 0; v < visits.Count; v++)
             foreach (var id in visits[v]) predicted[id] = v;
 
-        // Walk images in time order and compare, for each neighbouring pair, "same visit?" with the truth.
+        // Walk images in time order and compare neighbours with the truth.
         var ordered = files.OrderBy(f => f.Input.TakenAt).ThenBy(f => f.Input.RelPath, StringComparer.Ordinal).ToList();
-        int falseSplits = 0, falseMerges = 0;
+        int splitBursts = 0, triggersJoined = 0, differentAnimalsMerged = 0;
         for (var i = 1; i < ordered.Count; i++)
         {
-            var sameTruth = ordered[i].Truth == ordered[i - 1].Truth;
-            var samePredicted = predicted[ordered[i].Id] == predicted[ordered[i - 1].Id];
-            if (sameTruth && !samePredicted) falseSplits++;
-            if (!sameTruth && samePredicted) falseMerges++;
+            var (a, b) = (ordered[i - 1], ordered[i]);
+            var sameBurst = a.Truth == b.Truth;
+            var sameVisit = predicted[a.Id] == predicted[b.Id];
+            if (sameBurst && !sameVisit) splitBursts++;
+            if (!sameBurst && sameVisit)
+            {
+                triggersJoined++;
+                if (Known(a.Species).Any() && Known(b.Species).Any() && !Known(a.Species).Intersect(Known(b.Species)).Any())
+                    differentAnimalsMerged++;
+            }
         }
 
-        var truthCount = files.Select(f => f.Truth).Distinct().Count();
-        var exact = files.GroupBy(f => f.Truth)
-            .Count(g => g.Select(f => predicted[f.Id]).Distinct().Count() == 1
-                        && visits[predicted[g.First().Id]].Count == g.Count());
+        var bursts = files.Select(f => f.Truth).Distinct().Count();
         TestContext.Current.SendDiagnosticMessage(
-            $"{card}: {files.Count} images, {truthCount} true sequences → {visits.Count} visits. " +
-            $"{exact} reproduced exactly. Neighbour pairs: {falseSplits} wrongly split, {falseMerges} wrongly merged.");
+            $"{card}: {files.Count} images in {bursts} trigger bursts → {visits.Count} visits. " +
+            $"{triggersJoined} bursts joined into a longer visit, {splitBursts} bursts split, " +
+            $"{differentAnimalsMerged} times different animals in one visit.");
 
-        // Merging two animals into one visit is worse than splitting one visit in two (a split
-        // costs one extra click; a merge can hide an animal), so that is what we hold tight.
-        Assert.True(falseMerges <= Math.Max(1, ordered.Count / 50), $"{falseMerges} wrongly merged neighbours");
+        Assert.Equal(0, splitBursts);
+        // Rare, and every frame is still shown in the visit, but it must stay rare.
+        Assert.True(differentAnimalsMerged <= Math.Max(1, ordered.Count / 100),
+            $"{differentAnimalsMerged} visits mix different animals");
     }
+
+    /// <summary>"unknown" and "empty" say nothing about which animal it is.</summary>
+    private static IEnumerable<string> Known(IEnumerable<string> species) =>
+        species.Where(s => s is not ("unknown" or "empty" or "blank"));
 
     private static IEnumerable<string> CardDirs()
     {

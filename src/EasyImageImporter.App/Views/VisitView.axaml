@@ -77,7 +77,7 @@
         </DockPanel>
 
         <!-- Large view of one frame. -->
-        <DockPanel Background="#F0141814" IsVisible="{Binding Viewer, Converter={x:Static ObjectConverters.IsNotNull}}">
+        <DockPanel Background="#141814" IsVisible="{Binding Viewer, Converter={x:Static ObjectConverters.IsNotNull}}">
             <Border DockPanel.Dock="Bottom" Background="#F6F4EE" Padding="24,14">
                 <Grid ColumnDefinitions="*,Auto">
                     <StackPanel Orientation="Horizontal" Spacing="10">
