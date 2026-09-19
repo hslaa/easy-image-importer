@@ -77,6 +77,88 @@ public sealed class RealCardTests
             $"{differentAnimalsMerged} visits mix different animals");
     }
 
+    [Theory]
+    [MemberData(nameof(Cards))]
+    public void Places_match_the_real_camera_placements(string card)
+    {
+        var (visits, _) = LoadVisits(card, needSites: true);
+        var truth = visits.ToDictionary(v => v.Input.VisitId, v => v.Site);
+
+        var places = SiteDetector.Detect(visits.Select(v => v.Input).ToList());
+
+        var impure = places.Count(p => p.Select(id => truth[id]).Distinct().Count() > 1);
+        var realPlaces = truth.Values.Distinct().Count();
+        TestContext.Current.SendDiagnosticMessage(
+            $"{card}: {visits.Count} visits, {realPlaces} real placements → {places.Count} places found: " +
+            string.Join(" | ", places.Select(p => string.Join(",", p.Select(id => truth[id]).GroupBy(x => x).Select(g => $"{g.Key}×{g.Count()}")))));
+
+        Assert.Equal(0, impure);
+        Assert.Equal(realPlaces, places.Count);
+    }
+
+    private (List<(SiteInput Input, string Site)> Visits, string Dir) LoadVisits(string card, bool needSites)
+    {
+        var dir = CardDirs().FirstOrDefault(d => Path.GetFileName(d) == card);
+        Assert.SkipWhen(dir is null, "No generated test cards; run tools/testdata/build_cards.py");
+        var expected = JsonSerializer.Deserialize<Expected>(File.ReadAllText(Path.Combine(dir!, "expected.json")), Json)!;
+        Assert.SkipWhen(needSites && expected.Files.Any(f => f.Site is null), $"{card} has no place ground truth");
+
+        var inputs = expected.Files.Select((f, i) =>
+        {
+            var path = Path.Combine(dir!, f.Path);
+            var info = MediaInfoReader.Read(path, File.GetLastWriteTimeUtc(path), path);
+            return (Input: new SequenceInput(i, info.TakenAt!.Value, info.Camera, f.Path), Path: path);
+        }).ToList();
+        var visits = SequenceBuilder.Build(inputs.Select(x => x.Input)).Select((ids, n) =>
+        {
+            var frames = ids.Select(id => inputs[(int)id]).ToList();
+            var scene = Scene.FromFrames(ReviewService.SampleFrames(frames.Select(f => f.Path).ToList()));
+            return (new SiteInput(n, frames[0].Input.TakenAt, frames[^1].Input.TakenAt, scene), expected.Files[(int)ids[0]].Site!);
+        }).ToList();
+        return (visits, dir!);
+    }
+
+    /// <summary>
+    /// Not a pass/fail test: prints how alike visit backgrounds are, same place versus different
+    /// places, day and night separately. This is what the place thresholds are chosen from.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Cards))]
+    public void Scene_similarity_report(string card)
+    {
+        var dir = CardDirs().FirstOrDefault(d => Path.GetFileName(d) == card);
+        Assert.SkipWhen(dir is null, "No generated test cards; run tools/testdata/build_cards.py");
+        var expected = JsonSerializer.Deserialize<Expected>(File.ReadAllText(Path.Combine(dir!, "expected.json")), Json)!;
+        Assert.SkipWhen(expected.Files.Any(f => f.Site is null), $"{card} has no place ground truth");
+
+        var inputs = expected.Files.Select((f, i) =>
+        {
+            var path = Path.Combine(dir!, f.Path);
+            var info = MediaInfoReader.Read(path, File.GetLastWriteTimeUtc(path), path);
+            return new SequenceInput(i, info.TakenAt!.Value, info.Camera, f.Path);
+        }).ToList();
+        var visits = SequenceBuilder.Build(inputs)
+            .Select(ids => (Site: expected.Files[(int)ids[0]].Site!, Scene: Scene.FromFrames(
+                ids.Where((_, i) => i % Math.Max(1, ids.Count / 12) == 0).Select(id => Path.Combine(dir!, expected.Files[(int)id].Path)))!))
+            .ToList();
+
+        var same = new List<double>();
+        var different = new List<double>();
+        for (var i = 0; i < visits.Count; i++)
+        for (var j = i + 1; j < visits.Count; j++)
+        {
+            if (visits[i].Scene.IsNight != visits[j].Scene.IsNight) continue;
+            (visits[i].Site == visits[j].Site ? same : different).Add(visits[i].Scene.Similarity(visits[j].Scene));
+        }
+
+        static string Stats(List<double> v) => v.Count == 0 ? "none" :
+            $"n={v.Count} min={v.Min():F2} p5={Pct(v, 5):F2} median={Pct(v, 50):F2} p95={Pct(v, 95):F2} max={v.Max():F2}";
+        static double Pct(List<double> v, int p) => v.Order().ElementAt(Math.Min(v.Count - 1, v.Count * p / 100));
+        TestContext.Current.SendDiagnosticMessage(
+            $"{card}: {visits.Count} visits ({visits.Count(v => v.Scene.IsNight)} night). " +
+            $"Same place: {Stats(same)}. Different places: {Stats(different)}.");
+    }
+
     /// <summary>"unknown" and "empty" say nothing about which animal it is.</summary>
     private static IEnumerable<string> Known(IEnumerable<string> species) =>
         species.Where(s => s is not ("unknown" or "empty" or "blank"));

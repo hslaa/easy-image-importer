@@ -52,13 +52,16 @@ public sealed partial class ImportStore
         tx.Commit();
     }
 
-    /// <summary>Moves <paramref name="fileIds"/> into a new visit of the same session. Returns its id.</summary>
+    /// <summary>Moves <paramref name="fileIds"/> into a new visit of the same session and place. Returns its id.</summary>
     public long SplitSequence(long sequenceId, IReadOnlyCollection<long> fileIds)
     {
         using var c = db.Open();
         using var tx = c.BeginTransaction();
         var id = (long)Scalar(c, tx,
-            "INSERT INTO sequences(session_id) SELECT session_id FROM sequences WHERE id = $q RETURNING id;",
+            """
+            INSERT INTO sequences(session_id, site_group_id)
+            SELECT session_id, site_group_id FROM sequences WHERE id = $q RETURNING id;
+            """,
             ("$q", sequenceId))!;
         AssignToSequence(c, tx, id, fileIds);
         tx.Commit();
@@ -77,14 +80,76 @@ public sealed partial class ImportStore
         tx.Commit();
     }
 
-    public IReadOnlyDictionary<long, string?> GetSequenceLabels(long sessionId)
+    public IReadOnlyDictionary<long, (string? Label, long? SiteId)> GetSequenceInfo(long sessionId)
     {
         using var c = db.Open();
-        using var cmd = Command(c, null, "SELECT id, label FROM sequences WHERE session_id = $s;", ("$s", sessionId));
-        var result = new Dictionary<long, string?>();
+        using var cmd = Command(c, null, "SELECT id, label, site_group_id FROM sequences WHERE session_id = $s;", ("$s", sessionId));
+        var result = new Dictionary<long, (string?, long?)>();
         using var r = cmd.ExecuteReader();
-        while (r.Read()) result[r.GetInt64(0)] = r.IsDBNull(1) ? null : r.GetString(1);
+        while (r.Read()) result[r.GetInt64(0)] = (r.IsDBNull(1) ? null : r.GetString(1), r.IsDBNull(2) ? null : r.GetInt64(2));
         return result;
+    }
+
+    // ---- Places ---------------------------------------------------------------------------
+
+    public bool HasSites(long sessionId) =>
+        Scalar("SELECT EXISTS(SELECT 1 FROM site_groups WHERE session_id = $s);", ("$s", sessionId)) is 1L;
+
+    /// <summary>Creates one place per group of visits, named "Sted 1", "Sted 2", … in the given order.</summary>
+    public void CreateSites(long sessionId, IEnumerable<IReadOnlyList<long>> groups)
+    {
+        using var c = db.Open();
+        using var tx = c.BeginTransaction();
+        var n = 0;
+        foreach (var group in groups)
+        {
+            var id = (long)Scalar(c, tx, "INSERT INTO site_groups(session_id, name) VALUES ($s, $n) RETURNING id;",
+                ("$s", sessionId), ("$n", $"Sted {++n}"))!;
+            AssignToSite(c, tx, id, group);
+        }
+        tx.Commit();
+    }
+
+    public IReadOnlyDictionary<long, string> GetSiteNames(long sessionId)
+    {
+        using var c = db.Open();
+        using var cmd = Command(c, null, "SELECT id, name FROM site_groups WHERE session_id = $s;", ("$s", sessionId));
+        var result = new Dictionary<long, string>();
+        using var r = cmd.ExecuteReader();
+        while (r.Read()) result[r.GetInt64(0)] = r.GetString(1);
+        return result;
+    }
+
+    /// <summary>Moves visits into a new place of the same session. Returns its id.</summary>
+    public long SplitSite(long sessionId, IReadOnlyCollection<long> sequenceIds)
+    {
+        using var c = db.Open();
+        using var tx = c.BeginTransaction();
+        var count = (long)Scalar(c, tx, "SELECT COUNT(*) FROM site_groups WHERE session_id = $s;", ("$s", sessionId))!;
+        var id = (long)Scalar(c, tx, "INSERT INTO site_groups(session_id, name) VALUES ($s, $n) RETURNING id;",
+            ("$s", sessionId), ("$n", $"Sted {count + 1}"))!;
+        AssignToSite(c, tx, id, sequenceIds);
+        tx.Commit();
+        return id;
+    }
+
+    public void MergeSites(long keptId, long removedId)
+    {
+        using var c = db.Open();
+        using var tx = c.BeginTransaction();
+        Execute(c, tx, "UPDATE sequences SET site_group_id = $k WHERE site_group_id = $r;", ("$k", keptId), ("$r", removedId));
+        Execute(c, tx, "DELETE FROM site_groups WHERE id = $r;", ("$r", removedId));
+        tx.Commit();
+    }
+
+    private static void AssignToSite(SqliteConnection c, SqliteTransaction tx, long siteId, IEnumerable<long> sequenceIds)
+    {
+        using var cmd = Command(c, tx, "UPDATE sequences SET site_group_id = $g WHERE id = $id;", ("$g", siteId), ("$id", 0L));
+        foreach (var sequenceId in sequenceIds)
+        {
+            cmd.Parameters["$id"].Value = sequenceId;
+            cmd.ExecuteNonQuery();
+        }
     }
 
     private static void AssignToSequence(SqliteConnection c, SqliteTransaction tx, long sequenceId, IEnumerable<long> fileIds)

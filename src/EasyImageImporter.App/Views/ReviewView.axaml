@@ -36,7 +36,18 @@
                         <VirtualizingStackPanel />
                     </ItemsPanelTemplate>
                 </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
+                <ItemsControl.DataTemplates>
+                    <DataTemplate DataType="review:PlaceHeader">
+                        <Grid ColumnDefinitions="*,Auto" Margin="0,12,14,12">
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="{Binding Name}" FontSize="22" FontWeight="SemiBold" />
+                                <TextBlock Classes="muted" FontSize="15" Text="{Binding Details}" />
+                            </StackPanel>
+                            <Button Grid.Column="1" Classes="link" FontSize="15" Content="Samme sted som over"
+                                    Command="{Binding MergeWithAboveCommand}" IsVisible="{Binding CanMerge}"
+                                    VerticalAlignment="Bottom" />
+                        </Grid>
+                    </DataTemplate>
                     <DataTemplate DataType="review:VisitRow">
                         <ItemsControl ItemsSource="{Binding Items}">
                             <ItemsControl.ItemsPanel>
@@ -68,7 +79,7 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
                     </DataTemplate>
-                </ItemsControl.ItemTemplate>
+                </ItemsControl.DataTemplates>
             </ItemsControl>
         </ScrollViewer>
     </DockPanel>

@@ -33,6 +33,8 @@
                 <Button Content="Sorter bort alle" Command="{Binding DiscardAllCommand}" Margin="0,0,8,8" />
                 <Button Classes="link" Content="Slå sammen med neste hendelse" Command="{Binding MergeWithNextCommand}"
                         Margin="0,0,8,8" />
+                <Button Classes="link" Content="Nytt sted fra denne hendelsen" Command="{Binding StartNewPlaceCommand}"
+                        Margin="0,0,8,8" />
             </WrapPanel>
 
             <ScrollViewer Margin="0,8,0,0">

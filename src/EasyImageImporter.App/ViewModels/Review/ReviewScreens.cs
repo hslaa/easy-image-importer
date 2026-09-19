@@ -8,6 +8,20 @@ namespace EasyImageImporter.App.ViewModels.Review;
 
 // Lists are split into fixed-width rows so the list can be virtualized: only rows on screen exist.
 public sealed record VisitRow(IReadOnlyList<VisitCard> Items);
+
+/// <summary>Heading above a place's visits in the overview.</summary>
+public sealed partial class PlaceHeader(Place place, Action? mergeWithAbove)
+{
+    public string Name { get; } = place.Name;
+    public string Details { get; } =
+        $"{Rows.DateRangeText(place.Start, place.End)} · {place.Visits.Count:N0} " +
+        $"{(place.Visits.Count == 1 ? "hendelse" : "hendelser")}, {Rows.Count(place.ImageCount)}";
+    public bool CanMerge => mergeWithAbove is not null;
+
+    [RelayCommand]
+    private void MergeWithAbove() => mergeWithAbove?.Invoke();
+}
+
 public sealed record FrameRow(IReadOnlyList<FrameTile> Items);
 
 internal static class Rows
@@ -22,18 +36,27 @@ internal static class Rows
 
     /// <summary>A camera whose clock was reset shows year 2000; don't pretend that is a real date.</summary>
     public static string DateText(DateTime t) => t.Year < 2010 ? "Ukjent dato" : t.ToString("d. MMMM yyyy");
+
+    public static string DateRangeText(DateTime start, DateTime end) =>
+        start.Year < 2010 ? "Ukjent dato"
+        : start.Date == end.Date ? start.ToString("d. MMMM yyyy")
+        : start.Year == end.Year && start.Month == end.Month ? $"{start:d.}–{end:d. MMMM yyyy}"
+        : start.Year == end.Year ? $"{start:d. MMMM} – {end:d. MMMM yyyy}"
+        : $"{start:d. MMMM yyyy} – {end:d. MMMM yyyy}";
 }
 
 /// <summary>All visits on the card. "Default is keep everything": the user actively sorts away.</summary>
 public sealed partial class ReviewScreen(
-    ReviewOverview overview, IReadOnlyList<VisitCard> cards, string? alreadyImportedText, string? failedText,
+    ReviewOverview overview, IReadOnlyList<object> rows, string? alreadyImportedText, string? failedText,
     Func<Task> save, Func<Task> retryFailed) : Screen
 {
-    public IReadOnlyList<VisitRow> Rows { get; } = Review.Rows.Of(cards, 3, items => new VisitRow(items));
+    /// <summary>A <see cref="PlaceHeader"/> followed by that place's <see cref="VisitRow"/>s, place by place.</summary>
+    public IReadOnlyList<object> Rows { get; } = rows;
 
     public string Summary { get; } =
         $"{Review.Rows.Count(overview.ImageCount)} i {overview.Visits.Count:N0} " +
-        $"{(overview.Visits.Count == 1 ? "hendelse" : "hendelser")}. " +
+        $"{(overview.Visits.Count == 1 ? "hendelse" : "hendelser")}" +
+        (overview.Places.Count > 1 ? $" på {overview.Places.Count:N0} steder. " : ". ") +
         (overview.KeptCount == overview.ImageCount
             ? "Alle blir lagret."
             : $"{Review.Rows.Count(overview.KeptCount)} blir lagret, {overview.ImageCount - overview.KeptCount:N0} sorteres bort.");
@@ -85,8 +108,9 @@ public sealed partial class VisitScreen : Screen
     private readonly ReviewService _review;
     private readonly Action<Visit, long> _split;
 
-    public VisitScreen(Visit visit, int number, int total, IReadOnlyList<FrameTile> tiles, ReviewService review,
-        Action back, Action? previous, Action? next, Action? mergeWithNext, Action<Visit, long> split)
+    public VisitScreen(Visit visit, int number, int total, string placeName, IReadOnlyList<FrameTile> tiles,
+        ReviewService review, Action back, Action? previous, Action? next, Action? mergeWithNext,
+        Action<Visit, long> split, Action? startNewPlace)
     {
         _visit = visit;
         _review = review;
@@ -94,7 +118,8 @@ public sealed partial class VisitScreen : Screen
         Tiles = tiles;
         Rows = Review.Rows.Of(tiles, 4, items => new FrameRow(items));
         Title = $"Hendelse {number} av {total}";
-        Details = $"{Review.Rows.DateText(visit.Start)} · {Review.Rows.TimeSpanText(visit.Start, visit.End)} · {Review.Rows.Count(visit.Frames.Count)}";
+        Details = $"{placeName} · {Review.Rows.DateText(visit.Start)} · {Review.Rows.TimeSpanText(visit.Start, visit.End)} · {Review.Rows.Count(visit.Frames.Count)}";
+        StartNewPlaceCommand = new RelayCommand(() => startNewPlace?.Invoke(), () => startNewPlace is not null);
         BackCommand = new RelayCommand(back);
         PreviousCommand = new RelayCommand(() => previous?.Invoke(), () => previous is not null);
         NextCommand = new RelayCommand(() => next?.Invoke(), () => next is not null);
@@ -115,6 +140,7 @@ public sealed partial class VisitScreen : Screen
     public IRelayCommand PreviousCommand { get; }
     public IRelayCommand NextCommand { get; }
     public IRelayCommand MergeWithNextCommand { get; }
+    public IRelayCommand StartNewPlaceCommand { get; }
 
     [RelayCommand]
     private void KeepAll() => SetAll(true);

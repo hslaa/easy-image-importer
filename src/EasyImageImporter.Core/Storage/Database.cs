@@ -102,6 +102,16 @@ public sealed class Database
 
         ALTER TABLE imports ADD COLUMN discarded_count INTEGER NOT NULL DEFAULT 0;
         """,
+        // 4: places ("steder"). Visits are grouped by camera placement, found from the background.
+        """
+        CREATE TABLE site_groups(
+            id         INTEGER PRIMARY KEY,
+            session_id INTEGER NOT NULL REFERENCES sessions(id),
+            name       TEXT NOT NULL
+        );
+        CREATE INDEX ix_site_groups_session ON site_groups(session_id);
+        ALTER TABLE sequences ADD COLUMN site_group_id INTEGER REFERENCES site_groups(id);
+        """,
     ];
 
     private readonly string _connectionString;

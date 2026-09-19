@@ -20,6 +20,40 @@ public static class TestImages
         return data.ToArray();
     }
 
+    /// <summary>
+    /// A frame from camera placement <paramref name="place"/>: a fixed pattern of trunks and rocks per
+    /// place, a small "animal" somewhere different each frame, and a bit of lighting variation.
+    /// Night frames are grey, like infrared.
+    /// </summary>
+    public static byte[] Scene(int place, int frame, bool night = false)
+    {
+        const int w = 640, h = 480;
+        var layout = new Random(place * 7919);
+        var jitter = new Random(place * 31 + frame * 1009 + (night ? 5 : 0));
+        using var bitmap = new SKBitmap(w, h);
+        using (var canvas = new SKCanvas(bitmap))
+        {
+            var light = (byte)(night ? 70 + jitter.Next(20) : 150 + jitter.Next(40));
+            canvas.Clear(night ? new SKColor(light, light, light) : new SKColor((byte)(light / 2), light, (byte)(light / 3)));
+            using var paint = new SKPaint { IsAntialias = true };
+            for (var i = 0; i < 9; i++)
+            {
+                var shade = (byte)layout.Next(20, 90);
+                paint.Color = night ? new SKColor(shade, shade, shade) : new SKColor(shade, (byte)(shade / 2), (byte)(shade / 3));
+                var x = layout.Next(w);
+                if (i % 2 == 0) canvas.DrawRect(x, 0, 18 + layout.Next(30), h, paint);                   // trunk
+                else canvas.DrawOval(x, h * 0.75f + layout.Next(60), 30 + layout.Next(40), 18, paint); // rock
+            }
+            paint.Color = night ? SKColors.White : new SKColor(120, 80, 40);
+            canvas.DrawOval(jitter.Next(w), h / 2f + jitter.Next(h / 4), 40, 25, paint);               // animal
+            paint.Color = SKColors.Black;
+            canvas.DrawRect(0, h - 30, w, 30, paint);                                                  // date strip
+        }
+        using var image = SKImage.FromBitmap(bitmap);
+        using var data = image.Encode(SKEncodedImageFormat.Jpeg, 85);
+        return data.ToArray();
+    }
+
     /// <summary>A JPEG with EXIF Make, Model and DateTimeOriginal, as a trail camera writes them.</summary>
     public static byte[] JpegWithExif(DateTime takenAt, string make = "Browning", string model = "BTC-8E")
     {

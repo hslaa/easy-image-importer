@@ -19,10 +19,23 @@ public sealed class ReviewFlow(
     {
         var overview = review.GetOverview(sessionId);
         var counts = store.GetCounts(sessionId);
-        var cards = overview.Visits.Select((visit, i) =>
-            new VisitCard(visit, i + 1, Thumb(visit.Cover), OpenVisit, SetVisitKeep)).ToList();
+        var rows = new List<object>();
+        var number = 0;
+        for (var p = 0; p < overview.Places.Count; p++)
+        {
+            var place = overview.Places[p];
+            var above = p > 0 ? overview.Places[p - 1] : null;
+            rows.Add(new PlaceHeader(place, above is null ? null : () =>
+            {
+                review.MergePlaces(above, place);
+                ShowOverview();
+            }));
+            var cards = place.Visits.Select(visit =>
+                new VisitCard(visit, ++number, Thumb(visit.Cover), OpenVisit, SetVisitKeep)).ToList();
+            rows.AddRange(Rows.Of(cards, 3, items => new VisitRow(items)));
+        }
 
-        show(new ReviewScreen(overview, cards,
+        show(new ReviewScreen(overview, rows,
             alreadyImportedText: counts.Duplicate == 0 ? null
                 : $"{counts.Duplicate:N0} av bildene var importert fra før og blir hoppet over.",
             failedText: counts.Failed == 0 ? null
@@ -40,7 +53,8 @@ public sealed class ReviewFlow(
 
     private void OpenVisit(long visitId)
     {
-        var visits = review.GetOverview(sessionId).Visits;
+        var overview = review.GetOverview(sessionId);
+        var visits = overview.Visits;
         var index = visits.ToList().FindIndex(v => v.Id == visitId);
         if (index < 0)
         {
@@ -49,6 +63,8 @@ public sealed class ReviewFlow(
         }
 
         var visit = visits[index];
+        var place = overview.Places.First(p => p.Visits.Any(v => v.Id == visit.Id));
+        var firstAtPlace = place.Visits[0].Id == visit.Id;
         var previous = index > 0 ? visits[index - 1] : null;
         var next = index < visits.Count - 1 ? visits[index + 1] : null;
 
@@ -56,7 +72,7 @@ public sealed class ReviewFlow(
         var tiles = visit.Frames
             .Select(f => new FrameTile(f, review.StagedPath(f), Thumb(f), review, () => screen))
             .ToList();
-        screen = new VisitScreen(visit, index + 1, visits.Count, tiles, review,
+        screen = new VisitScreen(visit, index + 1, visits.Count, place.Name, tiles, review,
             back: ShowOverview,
             previous: previous is null ? null : () => OpenVisit(previous.Id),
             next: next is null ? null : () => OpenVisit(next.Id),
@@ -69,6 +85,11 @@ public sealed class ReviewFlow(
             {
                 review.Split(v, firstOfNew);
                 OpenVisit(v.Id);
+            },
+            startNewPlace: firstAtPlace ? null : () =>
+            {
+                review.StartNewPlace(place, visit);
+                OpenVisit(visit.Id);
             });
         show(screen);
     }

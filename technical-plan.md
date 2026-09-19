@@ -150,6 +150,13 @@ Everything the UI shows is recoverable from this DB plus the files. Schema migra
 
 ### 4.2 Sted (site): time + frame, M4
 
+**Status:** implemented in the review (places above visits), without cross-season memory yet. Scenes are
+128×96 edge maps of the per-pixel median of up to 12 frames per visit, date strip cropped; similarity is
+the best normalized correlation over ±6 px shifts. On the real test cards different places never scored
+above 0.23, so the threshold is 0.30; a visit is compared with the last 8 visits of its kind (day/night)
+at the current place, one odd visit doesn't start a new place, and a move whose first photos are at night
+is placed in the longest quiet period. All four real cards come out exactly right (A → B → A included).
+
 One card usually comes from **one camera**. The user moves that camera between placements without emptying the card. So within a card, sites are **contiguous stretches of time**, and the task is to find the points where the camera was moved. That is much easier and more robust than free-form clustering.
 
 **Background plate per sequence.** For each sequence:
