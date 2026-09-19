@@ -61,10 +61,12 @@ public sealed partial class AnimalRecognition : ObservableObject, IDisposable
         Text = "Laster ned dyregjenkjenning …";
         try
         {
+            var clock = System.Diagnostics.Stopwatch.StartNew();
             var progress = new Progress<DownloadProgress>(p =>
             {
                 Progress = 100.0 * p.Bytes / p.Total;
-                Text = $"Laster ned dyregjenkjenning … {p.Bytes / 1_000_000:N0} av {p.Total / 1_000_000:N0} MB";
+                Text = WithTimeLeft($"Laster ned dyregjenkjenning … {p.Bytes / 1_000_000:N0} av {p.Total / 1_000_000:N0} MB",
+                    TimeLeft.Estimate(clock.Elapsed, p.Bytes, p.Total - p.Bytes));
             });
             await Task.Run(() => _models.DownloadAsync(progress));
             Log.Information("Animal recognition models downloaded");
@@ -101,16 +103,20 @@ public sealed partial class AnimalRecognition : ObservableObject, IDisposable
 
     public void Stop() => _run?.Cancel();
 
+    private static string WithTimeLeft(string text, string? timeLeft) => timeLeft is null ? text : $"{text} · {timeLeft}";
+
     private void Analyse(long sessionId, CancellationToken ct)
     {
         try
         {
             _recognizer ??= new Recognizer(_models.Folder);
+            var clock = System.Diagnostics.Stopwatch.StartNew();
             var progress = new SyncProgress<AnalysisProgress>(p => Dispatcher.UIThread.Post(() =>
             {
                 if (ct.IsCancellationRequested) return;
                 Progress = 100.0 * p.VisitsDone / Math.Max(1, p.VisitsTotal);
-                Text = $"Ser etter dyr … {p.VisitsDone:N0} av {p.VisitsTotal:N0} hendelser";
+                Text = WithTimeLeft($"Ser etter dyr … {p.VisitsDone:N0} av {p.VisitsTotal:N0} hendelser",
+                    TimeLeft.Estimate(clock.Elapsed, p.FramesAnalysed, p.FramesLeft));
                 if (p.VisitId is { } id) VisitAnalysed?.Invoke(id);
             }));
             new AnimalAnalysis(_store, _review).Run(sessionId, _recognizer, progress, ct);

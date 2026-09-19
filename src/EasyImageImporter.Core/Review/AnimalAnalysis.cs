@@ -9,7 +9,9 @@ public enum SuggestionKind { Empty, Animal, Unsure }
 /// <summary>A visit's suggested label. Never acted on without the user: suggest and confirm.</summary>
 public sealed record AnimalSuggestion(SuggestionKind Kind, string Name, double Score);
 
-public readonly record struct AnalysisProgress(int VisitsDone, int VisitsTotal, long? VisitId);
+/// <param name="FramesAnalysed">Frames analysed in this run (resumed work doesn't count).</param>
+/// <param name="FramesLeft">Frames still to analyse; with the rate so far, how long is left.</param>
+public readonly record struct AnalysisProgress(int VisitsDone, int VisitsTotal, long? VisitId, int FramesAnalysed = 0, int FramesLeft = 0);
 
 /// <summary>
 /// Looks at a few frames of every visit with the animal-recognition models, in the background,
@@ -63,10 +65,13 @@ public sealed class AnimalAnalysis(ImportStore store, ReviewService review)
     {
         var visits = review.GetOverview(sessionId).Visits;
         var done = store.GetFrameResults(sessionId);
-        var finished = 0;
-        foreach (var visit in visits)
+        var pending = visits.Select(v => FramesToCheck(v).Where(f => !done.ContainsKey(f.Id)).ToList()).ToList();
+        var left = pending.Sum(p => p.Count);
+        var (finished, analysed) = (0, 0);
+        for (var i = 0; i < visits.Count; i++)
         {
-            foreach (var frame in FramesToCheck(visit).Where(f => !done.ContainsKey(f.Id)))
+            var visit = visits[i];
+            foreach (var frame in pending[i])
             {
                 ct.ThrowIfCancellationRequested();
                 FrameAnalysis analysis;
@@ -83,8 +88,10 @@ public sealed class AnimalAnalysis(ImportStore store, ReviewService review)
                 store.SaveFrameResult(new FrameResult(frame.Id, top?.Label, analysis.TopConfidence,
                     top is null ? null : string.Create(CultureInfo.InvariantCulture, $"{top.X:F4} {top.Y:F4} {top.Width:F4} {top.Height:F4}"),
                     analysis.Prediction.Label, analysis.Prediction.Score, analysis.NorwegianName), ModelVersion);
+                analysed++;
+                left--;
             }
-            progress?.Report(new AnalysisProgress(++finished, visits.Count, visit.Id));
+            progress?.Report(new AnalysisProgress(++finished, visits.Count, visit.Id, analysed, left));
         }
     }
 }

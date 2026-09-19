@@ -100,9 +100,12 @@ public sealed class AnimalAnalysisTests : IDisposable
         Assert.Null(halfway[1].Suggestion);
 
         var again = new FakeRecognizer(_ => Saw(Raven, 0.9));
-        Analysis.Run(session.Id, again);
+        var reports = new List<AnalysisProgress>();
+        Analysis.Run(session.Id, again, new SyncProgress<AnalysisProgress>(reports.Add));
 
         Assert.Equal(3 + 2, again.Calls);
+        // Frames count only work done in this run, so the time estimate isn't fooled by the resumed part.
+        Assert.Equal([(0, 5), (3, 2), (5, 0)], reports.Select(r => (r.FramesAnalysed, r.FramesLeft)));
         Assert.All(_env.Review.GetOverview(session.Id).Visits, v => Assert.NotNull(v.Suggestion));
     }
 
