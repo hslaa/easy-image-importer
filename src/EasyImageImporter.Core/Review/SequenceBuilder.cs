@@ -3,7 +3,7 @@ namespace EasyImageImporter.Core.Review;
 public sealed record SequenceInput(long FileId, DateTime TakenAt, string? Camera, string RelPath);
 
 /// <summary>
-/// Splits a card's images into visits ("hendelser"): one camera's images, in time order, with a new
+/// Splits a card's images into visits ("bildeserier"): one camera's images, in time order, with a new
 /// visit wherever the camera was quiet for longer than <see cref="DefaultGap"/>.
 /// Only gaps matter, so a camera whose clock was reset to 2000-01-01 still groups correctly.
 /// </summary>

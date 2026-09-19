@@ -194,6 +194,6 @@ Ship 1–2 to him early and let real use shape the rest.
 ## Appendix — glossary
 
 - **Sted** — a camera placement. One physical spot, camera stationary. E.g. *Høgfjellåsen*.
-- **Hendelse** — one animal visit; a burst of images close in time at one site.
+- **Hendelse** (shown as «bildeserie» in the app) — one animal visit; a burst of images close in time at one site.
 - **Sortert bort** — the folder holding images he chose not to keep. Recoverable, never auto-deleted.
 - **Staging** — the app's internal verified copy of the card contents, before he decides what to keep.

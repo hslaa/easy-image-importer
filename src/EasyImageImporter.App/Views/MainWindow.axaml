@@ -9,19 +9,48 @@
         Title="EasyImageImporter"
         Width="1040" Height="760" MinWidth="780" MinHeight="540"
         WindowStartupLocation="CenterScreen"
-        Background="#F6F4EE">
+        Background="{StaticResource PageBrush}"
+        Foreground="{StaticResource TextBrush}">
 
     <Window.DataTemplates>
 
+        <!-- One saved folder, with the way to open it. Used after saving and in "Mine importer". -->
+        <DataTemplate DataType="vm:FolderLink">
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14" Margin="0,6">
+                <Border Width="44" Height="44" CornerRadius="10" Background="{StaticResource AccentSoftBrush}">
+                    <Path Classes="icon" Data="{StaticResource IconFolder}" Stroke="{StaticResource AccentBrush}"
+                          HorizontalAlignment="Center" />
+                </Border>
+                <StackPanel Grid.Column="1" Spacing="0" VerticalAlignment="Center">
+                    <TextBlock Classes="strong" Text="{Binding Name}" />
+                    <TextBlock Classes="small muted" Text="{Binding CountText}" />
+                    <TextBlock Classes="small warning" IsVisible="{Binding Missing}" Text="Mappen er flyttet eller slettet." />
+                </StackPanel>
+                <Button Grid.Column="2" Content="Åpne mappen" Command="{Binding OpenCommand}" IsVisible="{Binding Exists}"
+                        VerticalAlignment="Center" />
+            </Grid>
+        </DataTemplate>
+
         <DataTemplate DataType="vm:IdleScreen">
             <ScrollViewer>
-                <StackPanel Spacing="16" VerticalAlignment="Center" Margin="48,40" MaxWidth="900">
-                    <TextBlock Classes="title" Text="Sett inn minnekortet fra viltkameraet." />
-                    <TextBlock Classes="muted"
-                               Text="Bildene blir kopiert og kontrollert før du gjør noe annet. Ingenting blir slettet fra kortet uten at du ber om det." />
-                    <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,16,0,0">
-                        <Button Content="Mine importer" Command="{Binding ShowImportsCommand}" />
-                        <Button Content="Velg mappe selv …" Command="{Binding ChooseFolderCommand}" />
+                <StackPanel Spacing="18" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="48,40" MaxWidth="640">
+                    <Border Width="112" Height="112" CornerRadius="56" Background="{StaticResource AccentSoftBrush}"
+                            HorizontalAlignment="Center">
+                        <Path Classes="icon" Data="{StaticResource IconCard}" Stroke="{StaticResource AccentBrush}"
+                              Width="52" Height="52" Stretch="Uniform" StrokeThickness="2.5" HorizontalAlignment="Center" />
+                    </Border>
+                    <TextBlock Classes="title" TextAlignment="Center" Text="Sett inn minnekortet fra viltkameraet." />
+                    <TextBlock Classes="muted" TextAlignment="Center"
+                               Text="Bildene blir kopiert og kontrollert med en gang. Ingenting blir slettet fra kortet uten at du ber om det." />
+                    <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,14,0,0" HorizontalAlignment="Center">
+                        <Button Command="{Binding ShowImportsCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <Path Classes="icon" Data="{StaticResource IconFolder}" />
+                                <TextBlock Text="Mine importer" />
+                            </StackPanel>
+                        </Button>
+                        <Button Content="Velg mappe selv …" Command="{Binding ChooseFolderCommand}"
+                                ToolTip.Tip="For bilder som ikke ligger på et minnekort" />
                     </StackPanel>
                 </StackPanel>
             </ScrollViewer>
@@ -29,145 +58,173 @@
 
         <DataTemplate DataType="vm:WorkingScreen">
             <ScrollViewer>
-                <StackPanel Spacing="16" VerticalAlignment="Center" Margin="48,40" MaxWidth="900">
+                <StackPanel Spacing="14" VerticalAlignment="Center" Margin="48,40" MaxWidth="720">
                     <TextBlock Classes="title" Text="{Binding Title}" />
-                    <TextBlock Text="{Binding Detail}" />
-                    <ProgressBar Value="{Binding Progress}" IsIndeterminate="{Binding IsIndeterminate}" Maximum="100" />
+                    <TextBlock Classes="muted" Text="{Binding Detail}" />
+                    <ProgressBar Value="{Binding Progress}" IsIndeterminate="{Binding IsIndeterminate}" Maximum="100" Margin="0,6,0,0" />
                 </StackPanel>
             </ScrollViewer>
         </DataTemplate>
 
         <DataTemplate DataType="vm:MessageScreen">
             <ScrollViewer>
-                <StackPanel Spacing="16" VerticalAlignment="Center" Margin="48,40" MaxWidth="900">
+                <StackPanel Spacing="16" VerticalAlignment="Center" Margin="48,40" MaxWidth="720">
+                    <Panel HorizontalAlignment="Left">
+                        <Border Width="64" Height="64" CornerRadius="32" Background="{StaticResource AccentBrush}"
+                                IsVisible="{Binding IsSuccess}">
+                            <Path Classes="icon" Data="{StaticResource IconCheck}" Stroke="White" StrokeThickness="3"
+                                  Width="34" Height="34" Stretch="Uniform" HorizontalAlignment="Center" />
+                        </Border>
+                        <Border Width="64" Height="64" CornerRadius="32" Background="{StaticResource DangerSoftBrush}"
+                                IsVisible="{Binding IsProblem}">
+                            <Path Classes="icon" Data="{StaticResource IconWarning}" Stroke="{StaticResource DangerBrush}"
+                                  Width="34" Height="34" Stretch="Uniform" HorizontalAlignment="Center" />
+                        </Border>
+                        <Border Width="64" Height="64" CornerRadius="32" Background="{StaticResource AccentSoftBrush}"
+                                IsVisible="{Binding IsInfo}">
+                            <Path Classes="icon" Data="{StaticResource IconInfo}" Stroke="{StaticResource AccentBrush}"
+                                  Width="34" Height="34" Stretch="Uniform" HorizontalAlignment="Center" />
+                        </Border>
+                    </Panel>
                     <TextBlock Classes="title" Text="{Binding Title}" />
                     <TextBlock Text="{Binding Body}" />
                     <Button Classes="primary" Content="{Binding ActionText}" Command="{Binding ActCommand}"
-                            IsVisible="{Binding HasAction}" Margin="0,16,0,0" />
+                            IsVisible="{Binding HasAction}" Margin="0,12,0,0" />
                 </StackPanel>
             </ScrollViewer>
         </DataTemplate>
 
         <DataTemplate DataType="vm:CopiedScreen">
             <ScrollViewer>
-                <StackPanel Spacing="16" VerticalAlignment="Center" Margin="48,40" MaxWidth="900">
+                <StackPanel Spacing="16" VerticalAlignment="Center" Margin="48,40" MaxWidth="720">
                     <TextBlock Classes="title" Text="{Binding Title}" />
                     <TextBlock Classes="muted" Text="{Binding AlreadyImportedText}" IsVisible="{Binding HasAlreadyImported}" />
-                    <StackPanel Spacing="12" IsVisible="{Binding HasFailed}">
-                        <TextBlock Classes="warning" Text="{Binding FailedText}" />
-                        <Button Content="Prøv å kopiere dem igjen" Command="{Binding RetryCommand}" />
-                    </StackPanel>
+                    <Border Classes="note" Background="{StaticResource DangerSoftBrush}" IsVisible="{Binding HasFailed}">
+                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                            <Path Classes="icon" Data="{StaticResource IconWarning}" Stroke="{StaticResource DangerBrush}" />
+                            <TextBlock Grid.Column="1" Classes="warning" Text="{Binding FailedText}" VerticalAlignment="Center" />
+                            <Button Grid.Column="2" Content="Prøv igjen" Command="{Binding RetryCommand}" />
+                        </Grid>
+                    </Border>
                     <Button Classes="primary" Content="Lagre bildene" Command="{Binding SaveCommand}"
-                            IsVisible="{Binding HasImagesToSave}" Margin="0,16,0,0" />
+                            IsVisible="{Binding HasImagesToSave}" Margin="0,12,0,0" />
                 </StackPanel>
             </ScrollViewer>
         </DataTemplate>
 
         <DataTemplate DataType="vm:DoneScreen">
             <ScrollViewer>
-                <StackPanel Spacing="16" VerticalAlignment="Center" Margin="48,40" MaxWidth="900">
-                    <TextBlock Classes="title" Text="{Binding Title}" />
-                    <StackPanel Spacing="12" IsVisible="{Binding HasFolder}">
-                        <ItemsControl ItemsSource="{Binding Folders}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate DataType="vm:FolderLink">
-                                    <Border Background="White" CornerRadius="10" Padding="18,12" Margin="0,0,0,8">
-                                        <Grid ColumnDefinitions="*,Auto">
-                                            <StackPanel Spacing="2" VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
-                                                <TextBlock Classes="muted" FontSize="15" Text="{Binding CountText}" />
-                                            </StackPanel>
-                                            <Button Grid.Column="1" Classes="primary" Content="Åpne mappen"
-                                                    Command="{Binding OpenCommand}" VerticalAlignment="Center" />
-                                        </Grid>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                        <TextBlock Classes="muted" Text="{Binding DiscardedText}"
+                <StackPanel Spacing="20" Margin="48,32" MaxWidth="820">
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="18">
+                        <Border Width="56" Height="56" CornerRadius="28" Background="{StaticResource AccentBrush}" VerticalAlignment="Top">
+                            <Path Classes="icon" Data="{StaticResource IconCheck}" Stroke="White" StrokeThickness="3"
+                                  Width="30" Height="30" Stretch="Uniform" HorizontalAlignment="Center" />
+                        </Border>
+                        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Classes="title" Text="{Binding Title}" />
+                            <TextBlock Classes="muted" Text="{Binding FoldersText}" IsVisible="{Binding HasFolder}" />
+                        </StackPanel>
+                    </Grid>
+
+                    <StackPanel Spacing="8" IsVisible="{Binding HasFolder}">
+                        <Border Classes="card" Padding="20,8">
+                            <ItemsControl ItemsSource="{Binding Folders}" />
+                        </Border>
+                        <TextBlock Classes="small muted" Text="{Binding DiscardedText}"
                                    IsVisible="{Binding DiscardedText, Converter={x:Static ObjectConverters.IsNotNull}}" />
                     </StackPanel>
 
-                    <Border Height="1" Background="#D9D5CA" Margin="0,16" />
-
-                    <!-- The erase step only exists once every image is verified. -->
-                    <StackPanel Spacing="12" IsVisible="{Binding CanErase}">
-                        <StackPanel Spacing="12" IsVisible="{Binding !Erase.IsAsking}">
-                            <TextBlock Text="{Binding EraseQuestion}" />
-                            <Button Content="Slett bildene fra kortet …" Command="{Binding Erase.AskCommand}" />
-                        </StackPanel>
-                        <StackPanel Spacing="12" IsVisible="{Binding Erase.IsAsking}">
-                            <TextBlock FontWeight="SemiBold"
-                                       Text="Er du sikker? Bildene er trygt lagret på datamaskinen, men blir borte fra kortet." />
+                    <!-- The last step. It only exists once every image is verified: absent, not greyed out. -->
+                    <Border Classes="card" Padding="24,20" BorderBrush="{StaticResource AccentBrush}" BorderThickness="2"
+                            IsVisible="{Binding CanErase}">
+                        <StackPanel Spacing="12">
                             <StackPanel Orientation="Horizontal" Spacing="12">
-                                <Button Content="Avbryt" Command="{Binding Erase.CancelCommand}" />
-                                <Button Classes="danger" Content="{Binding ConfirmText}" Command="{Binding Erase.ConfirmCommand}" />
+                                <Path Classes="icon" Data="{StaticResource IconCard}" Stroke="{StaticResource AccentBrush}" />
+                                <TextBlock Classes="heading" Text="Neste: tøm minnekortet" />
                             </StackPanel>
+                            <TextBlock Text="{Binding EraseQuestion}" />
+                            <Button Classes="primary" Content="Tøm kortet …" Command="{Binding Erase.AskCommand}"
+                                    IsVisible="{Binding !Erase.IsAsking}" Margin="0,4,0,0" />
+                            <Border Classes="note" Background="{StaticResource DangerSoftBrush}" IsVisible="{Binding Erase.IsAsking}">
+                                <StackPanel Spacing="12">
+                                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                                        <Path Classes="icon" Data="{StaticResource IconWarning}" Stroke="{StaticResource DangerBrush}" />
+                                        <TextBlock Grid.Column="1" Classes="strong"
+                                                   Text="Er du sikker? Bildene er trygt lagret på datamaskinen, men blir borte fra kortet." />
+                                    </Grid>
+                                    <WrapPanel>
+                                        <Button Content="Avbryt" Command="{Binding Erase.CancelCommand}" Margin="0,0,12,0" />
+                                        <Button Classes="danger" Content="{Binding ConfirmText}" Command="{Binding Erase.ConfirmCommand}" />
+                                    </WrapPanel>
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
-                    </StackPanel>
+                    </Border>
 
-                    <TextBlock Classes="warning" Text="{Binding EraseRefusal}" IsVisible="{Binding HasRefusal}" />
+                    <Border Classes="note" Background="{StaticResource DangerSoftBrush}" IsVisible="{Binding HasRefusal}">
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                            <Path Classes="icon" Data="{StaticResource IconWarning}" Stroke="{StaticResource DangerBrush}" />
+                            <TextBlock Grid.Column="1" Classes="warning" Text="{Binding EraseRefusal}" VerticalAlignment="Center" />
+                        </Grid>
+                    </Border>
 
                     <!-- Deliberately quiet: undo is a way back, not a next step. -->
-                    <StackPanel IsVisible="{Binding CanUndo}" Margin="0,8,0,0">
-                        <Button Classes="link" Content="Angre importen …" Command="{Binding Undo.AskCommand}"
-                                IsVisible="{Binding !Undo.IsAsking}" />
-                        <StackPanel Spacing="12" IsVisible="{Binding Undo.IsAsking}">
-                            <TextBlock Text="Angre importen? Bildene flyttes tilbake fra mappen, og du kan lagre dem på nytt. Ingen bilder blir slettet." />
-                            <StackPanel Orientation="Horizontal" Spacing="12">
-                                <Button Content="Avbryt" Command="{Binding Undo.CancelCommand}" />
-                                <Button Content="Ja, angre importen" Command="{Binding Undo.ConfirmCommand}" />
+                    <StackPanel IsVisible="{Binding CanUndo}">
+                        <Button Classes="link" FontSize="15" Content="Angre importen …" Command="{Binding Undo.AskCommand}"
+                                IsVisible="{Binding !Undo.IsAsking}" Margin="-6,0,0,0" />
+                        <Border Classes="card" Padding="20,16" IsVisible="{Binding Undo.IsAsking}">
+                            <StackPanel Spacing="12">
+                                <TextBlock Text="Angre importen? Bildene flyttes tilbake fra mappen, og du kan lagre dem på nytt. Ingen bilder blir slettet." />
+                                <WrapPanel>
+                                    <Button Content="Avbryt" Command="{Binding Undo.CancelCommand}" Margin="0,0,12,0" />
+                                    <Button Content="Ja, angre importen" Command="{Binding Undo.ConfirmCommand}" />
+                                </WrapPanel>
                             </StackPanel>
-                        </StackPanel>
+                        </Border>
                     </StackPanel>
                 </StackPanel>
             </ScrollViewer>
         </DataTemplate>
 
         <DataTemplate DataType="vm:ImportsScreen">
-            <DockPanel Margin="48,40">
-                <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,24">
-                    <TextBlock Classes="title" Text="Mine importer" VerticalAlignment="Center" />
-                    <Button Grid.Column="1" Content="Tilbake" Command="{Binding CloseCommand}" />
+            <DockPanel>
+                <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*" Margin="32,20,32,14">
+                    <Button Command="{Binding CloseCommand}" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Path Classes="icon" Data="{StaticResource IconBack}" />
+                            <TextBlock Text="Tilbake" />
+                        </StackPanel>
+                    </Button>
+                    <TextBlock Grid.Column="1" Classes="title" Text="Mine importer" VerticalAlignment="Center" Margin="20,0" />
                 </Grid>
-                <TextBlock DockPanel.Dock="Top" Classes="muted" IsVisible="{Binding IsEmpty}"
+                <Border DockPanel.Dock="Top" Height="1" Background="{StaticResource LineBrush}" />
+                <TextBlock DockPanel.Dock="Top" Classes="muted" IsVisible="{Binding IsEmpty}" Margin="32,24" MaxWidth="720"
+                           HorizontalAlignment="Left"
                            Text="Ingen bilder er lagret ennå. Når du har satt inn et minnekort og lagret bildene, dukker de opp her." />
                 <ScrollViewer>
-                    <ItemsControl ItemsSource="{Binding Rows}">
+                    <ItemsControl ItemsSource="{Binding Rows}" Margin="32,18,20,24">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate DataType="vm:ImportRow">
-                                <Border Background="White" CornerRadius="10" Padding="20,16" Margin="0,0,0,12">
-                                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto">
-                                        <TextBlock Classes="muted" FontSize="16" Text="{Binding Details}" VerticalAlignment="Center" />
-                                        <Button Grid.Column="1" Classes="link" Content="Angre …" Command="{Binding Undo.AskCommand}"
-                                                IsVisible="{Binding CanUndo}" />
+                                <Border Classes="card" Padding="20,14" Margin="0,0,0,14">
+                                    <StackPanel Spacing="4">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <TextBlock Classes="strong" Text="{Binding Details}" VerticalAlignment="Center" />
+                                            <Button Grid.Column="1" Classes="link" FontSize="15" Content="Angre …"
+                                                    Command="{Binding Undo.AskCommand}" IsVisible="{Binding CanUndo}" />
+                                        </Grid>
                                         <!-- One folder per place. -->
-                                        <ItemsControl Grid.Row="1" Grid.ColumnSpan="2" ItemsSource="{Binding Folders}" Margin="0,8,0,0">
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate DataType="vm:FolderLink">
-                                                    <Grid ColumnDefinitions="*,Auto" Margin="0,4">
-                                                        <StackPanel Spacing="2" VerticalAlignment="Center">
-                                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
-                                                            <TextBlock Classes="muted" FontSize="15" Text="{Binding CountText}" />
-                                                            <TextBlock Classes="warning" FontSize="15" IsVisible="{Binding Missing}"
-                                                                       Text="Mappen er flyttet eller slettet." />
-                                                        </StackPanel>
-                                                        <Button Grid.Column="1" Classes="primary" Content="Åpne mappen"
-                                                                Command="{Binding OpenCommand}" IsVisible="{Binding Exists}"
-                                                                VerticalAlignment="Center" />
-                                                    </Grid>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-                                        <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Spacing="12" Margin="0,16,0,0"
-                                                    IsVisible="{Binding Undo.IsAsking}">
-                                            <TextBlock Text="{Binding UndoText}" />
-                                            <StackPanel Orientation="Horizontal" Spacing="12">
-                                                <Button Content="Avbryt" Command="{Binding Undo.CancelCommand}" />
-                                                <Button Content="Ja, angre importen" Command="{Binding Undo.ConfirmCommand}" />
+                                        <ItemsControl ItemsSource="{Binding Folders}" />
+                                        <Border Classes="note" Background="{StaticResource HoverBrush}" Margin="0,8,0,0"
+                                                IsVisible="{Binding Undo.IsAsking}">
+                                            <StackPanel Spacing="12">
+                                                <TextBlock Text="{Binding UndoText}" />
+                                                <WrapPanel>
+                                                    <Button Content="Avbryt" Command="{Binding Undo.CancelCommand}" Margin="0,0,12,0" />
+                                                    <Button Content="Ja, angre importen" Command="{Binding Undo.ConfirmCommand}" />
+                                                </WrapPanel>
                                             </StackPanel>
-                                        </StackPanel>
-                                    </Grid>
+                                        </Border>
+                                    </StackPanel>
                                 </Border>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
@@ -191,8 +248,37 @@
     </Window.DataTemplates>
 
     <Panel>
-        <ContentControl Content="{Binding Screen}"
-                        IsVisible="{Binding Overlay, Converter={x:Static ObjectConverters.IsNull}}" />
+        <DockPanel IsVisible="{Binding Overlay, Converter={x:Static ObjectConverters.IsNull}}">
+            <!-- Where you are: Kopier · Gå gjennom · Navn og merking · Tøm kortet. -->
+            <Border DockPanel.Dock="Top" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource LineBrush}"
+                    BorderThickness="0,0,0,1" Padding="32,12" IsVisible="{Binding HasSteps}">
+                <ItemsControl ItemsSource="{Binding Steps}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="vm:FlowStep">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <Border Classes="step" Classes.current="{Binding IsCurrent}" Classes.done="{Binding IsDone}">
+                                    <Panel>
+                                        <TextBlock Classes="caption strong" Text="{Binding Number}" HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center" IsVisible="{Binding !IsDone}" />
+                                        <Path Classes="icon" Data="{StaticResource IconCheck}" Stroke="White" StrokeThickness="2.5"
+                                              Width="14" Height="14" Stretch="Uniform" HorizontalAlignment="Center"
+                                              IsVisible="{Binding IsDone}" />
+                                    </Panel>
+                                </Border>
+                                <TextBlock Classes="small" Text="{Binding Label}" VerticalAlignment="Center"
+                                           Classes.strong="{Binding IsCurrent}" Classes.muted="{Binding IsTodo}" />
+                                <Border Width="36" Height="2" Background="{StaticResource LineBrush}" Margin="4,0,14,0"
+                                        VerticalAlignment="Center" IsVisible="{Binding !IsLast}" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Border>
+            <ContentControl Content="{Binding Screen}" />
+        </DockPanel>
         <!-- "Mine importer" replaces the view of the flow without stopping it; copying carries on. -->
         <ContentControl Content="{Binding Overlay}"
                         IsVisible="{Binding Overlay, Converter={x:Static ObjectConverters.IsNotNull}}" />

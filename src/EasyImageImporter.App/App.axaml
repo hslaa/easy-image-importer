@@ -18,10 +18,55 @@
         </TrayIcons>
     </TrayIcon.Icons>
 
-    <Application.Styles>
-        <FluentTheme />
+    <!--
+    Design tokens. One place for colours, so every screen looks like the same app.
+    Calm and quiet: warm paper background, white cards, forest green for the one thing to do next,
+    brick red only for erasing the card. Text contrast is at least 4.5:1 on both backgrounds.
+    -->
+    <Application.Resources>
+        <SolidColorBrush x:Key="PageBrush" Color="#F4F2EC" />
+        <SolidColorBrush x:Key="SurfaceBrush" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="SunkenBrush" Color="#E9E5DA" />
+        <SolidColorBrush x:Key="LineBrush" Color="#DEDACF" />
+        <SolidColorBrush x:Key="ControlLineBrush" Color="#BDB7A8" />
+        <SolidColorBrush x:Key="HoverBrush" Color="#F1EEE6" />
+        <SolidColorBrush x:Key="PressedBrush" Color="#E6E2D7" />
+        <SolidColorBrush x:Key="TextBrush" Color="#1E231F" />
+        <SolidColorBrush x:Key="MutedBrush" Color="#586157" />
+        <SolidColorBrush x:Key="FaintBrush" Color="#8C9389" />
+        <SolidColorBrush x:Key="AccentBrush" Color="#2E5634" />
+        <SolidColorBrush x:Key="AccentHoverBrush" Color="#3A6B41" />
+        <SolidColorBrush x:Key="AccentPressedBrush" Color="#24452A" />
+        <SolidColorBrush x:Key="AccentSoftBrush" Color="#E4EDDF" />
+        <SolidColorBrush x:Key="DangerBrush" Color="#9A3412" />
+        <SolidColorBrush x:Key="DangerHoverBrush" Color="#B4431A" />
+        <SolidColorBrush x:Key="DangerSoftBrush" Color="#F8E9E1" />
+        <SolidColorBrush x:Key="ViewerBrush" Color="#121612" />
+        <SolidColorBrush x:Key="ViewerBarBrush" Color="#1D231E" />
+        <SolidColorBrush x:Key="ViewerTextBrush" Color="#E9ECE6" />
+        <SolidColorBrush x:Key="PlaceholderBrush" Color="#DDD8CC" />
 
-        <!-- Large, calm type: the user is not a computer person. -->
+        <!-- Line icons on a 24×24 grid, drawn with the Path.icon style below. -->
+        <StreamGeometry x:Key="IconCheck">M5,12.5 L10,17.5 L19,7</StreamGeometry>
+        <StreamGeometry x:Key="IconBack">M19,12 L5,12 M11,6 L5,12 L11,18</StreamGeometry>
+        <StreamGeometry x:Key="IconForward">M5,12 L19,12 M13,6 L19,12 L13,18</StreamGeometry>
+        <StreamGeometry x:Key="IconClose">M6,6 L18,18 M18,6 L6,18</StreamGeometry>
+        <StreamGeometry x:Key="IconFolder">M3,6.5 L3,18.5 L21,18.5 L21,8.5 L11.5,8.5 L9.5,6 L3,6 Z</StreamGeometry>
+        <StreamGeometry x:Key="IconCard">M7,2.5 L15.5,2.5 L19.5,6.5 L19.5,21.5 L4.5,21.5 L4.5,5 Z M9,3 L9,7 M12,3 L12,7 M15,3.5 L15,7</StreamGeometry>
+        <StreamGeometry x:Key="IconWarning">M12,3.5 L21.5,20 L2.5,20 Z M12,9.5 L12,14 M12,17 L12,17.2</StreamGeometry>
+        <StreamGeometry x:Key="IconInfo">M12,3 A9,9 0 1 1 11.99,3 Z M12,11 L12,16.5 M12,7.8 L12,8</StreamGeometry>
+        <StreamGeometry x:Key="IconSparkle">M12,3 L13.8,10.2 L21,12 L13.8,13.8 L12,21 L10.2,13.8 L3,12 L10.2,10.2 Z</StreamGeometry>
+    </Application.Resources>
+
+    <Application.Styles>
+        <FluentTheme>
+            <FluentTheme.Palettes>
+                <!-- Checkboxes, text-field focus, selected chips and progress follow the app's green. -->
+                <ColorPaletteResources x:Key="Light" Accent="#2E5634" RegionColor="#F4F2EC" BaseHigh="#1E231F" />
+            </FluentTheme.Palettes>
+        </FluentTheme>
+
+        <!-- Type scale: large and calm, the user is not a computer person. 28 / 22 / 18 / 15 / 14. -->
         <Style Selector="TextBlock">
             <Setter Property="FontSize" Value="18" />
             <Setter Property="TextWrapping" Value="Wrap" />
@@ -30,54 +75,274 @@
             <Setter Property="FontSize" Value="28" />
             <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
+        <Style Selector="TextBlock.heading">
+            <Setter Property="FontSize" Value="22" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="TextBlock.strong">
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="TextBlock.small">
+            <Setter Property="FontSize" Value="15" />
+        </Style>
+        <Style Selector="TextBlock.caption">
+            <Setter Property="FontSize" Value="14" />
+        </Style>
         <Style Selector="TextBlock.muted">
-            <Setter Property="Foreground" Value="#5A6358" />
+            <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
         </Style>
         <Style Selector="TextBlock.warning">
-            <Setter Property="Foreground" Value="#9A3412" />
+            <Setter Property="Foreground" Value="{StaticResource DangerBrush}" />
             <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
+
+        <Style Selector="Path.icon">
+            <Setter Property="Width" Value="24" />
+            <Setter Property="Height" Value="24" />
+            <Setter Property="Stroke" Value="{StaticResource TextBrush}" />
+            <Setter Property="StrokeThickness" Value="2" />
+            <Setter Property="StrokeLineCap" Value="Round" />
+            <Setter Property="StrokeJoin" Value="Round" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <!-- Cards: white panels on the paper background. -->
+        <Style Selector="Border.card">
+            <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="BorderBrush" Value="{StaticResource LineBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+        <Style Selector="Border.note">
+            <Setter Property="Background" Value="{StaticResource AccentSoftBrush}" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Padding" Value="16,12" />
+        </Style>
+
+        <!-- Buttons. The default is a quiet white button; .primary is the next step (one per screen). -->
         <Style Selector="Button">
             <Setter Property="FontSize" Value="18" />
-            <Setter Property="Padding" Value="20,12" />
+            <Setter Property="Padding" Value="20,11" />
+            <Setter Property="MinHeight" Value="46" />
             <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource ControlLineBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="Cursor" Value="Hand" />
         </Style>
+        <Style Selector="Button:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource HoverBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource ControlLineBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+        </Style>
+        <Style Selector="Button:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource PressedBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource ControlLineBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+        </Style>
+        <!-- Unavailable: clearly faded, so it is never mistaken for a button that works. -->
+        <Style Selector="Button:disabled">
+            <Setter Property="Opacity" Value="0.4" />
+        </Style>
+        <Style Selector="Button:disabled /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource ControlLineBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+        </Style>
+        <!-- Icons in buttons take the button's text colour. -->
+        <Style Selector="Button Path.icon">
+            <Setter Property="Width" Value="20" />
+            <Setter Property="Height" Value="20" />
+            <Setter Property="Stretch" Value="Uniform" />
+            <Setter Property="Stroke" Value="{StaticResource TextBrush}" />
+        </Style>
+        <Style Selector="Button.primary Path.icon, Button.danger Path.icon">
+            <Setter Property="Stroke" Value="White" />
+        </Style>
+        <Style Selector="Button.link Path.icon">
+            <Setter Property="Stroke" Value="{StaticResource AccentBrush}" />
+        </Style>
+        <Style Selector="Button.dark Path.icon">
+            <Setter Property="Stroke" Value="{StaticResource ViewerTextBrush}" />
+        </Style>
+
         <Style Selector="Button.primary">
-            <Setter Property="Background" Value="#2E5634" />
+            <Setter Property="Background" Value="{StaticResource AccentBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
             <Setter Property="Foreground" Value="White" />
             <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
-        <Style Selector="Button.primary:pointerover /template/ ContentPresenter">
-            <Setter Property="Background" Value="#3C6E43" />
+        <Style Selector="Button.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource AccentHoverBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource AccentHoverBrush}" />
             <Setter Property="Foreground" Value="White" />
         </Style>
+        <Style Selector="Button.primary:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource AccentPressedBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource AccentPressedBrush}" />
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+        <Style Selector="Button.primary:disabled /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource AccentBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+
         <Style Selector="Button.danger">
-            <Setter Property="Background" Value="#9A3412" />
+            <Setter Property="Background" Value="{StaticResource DangerBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource DangerBrush}" />
             <Setter Property="Foreground" Value="White" />
             <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
-        <Style Selector="Button.danger:pointerover /template/ ContentPresenter">
-            <Setter Property="Background" Value="#B4431A" />
+        <Style Selector="Button.danger:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource DangerHoverBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource DangerHoverBrush}" />
             <Setter Property="Foreground" Value="White" />
         </Style>
+        <Style Selector="Button.danger:disabled /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource DangerBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource DangerBrush}" />
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+
+        <!-- Small buttons inside cards (Ja / Nei, Legg til). -->
+        <Style Selector="Button.compact">
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="Padding" Value="14,5" />
+            <Setter Property="MinHeight" Value="36" />
+        </Style>
+
+        <!-- Text-only: for ways back and rarely used actions. -->
         <Style Selector="Button.link">
             <Setter Property="Background" Value="Transparent" />
-            <Setter Property="Foreground" Value="#2E5634" />
-            <Setter Property="Padding" Value="4,8" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+            <Setter Property="Padding" Value="6,8" />
+            <Setter Property="MinHeight" Value="0" />
         </Style>
+        <Style Selector="Button.link:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource AccentSoftBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource AccentPressedBrush}" />
+        </Style>
+        <Style Selector="Button.link:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource AccentSoftBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource AccentPressedBrush}" />
+        </Style>
+        <Style Selector="Button.link:disabled /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+        </Style>
+
         <!-- A thumbnail you can click: no button chrome around the image. -->
         <Style Selector="Button.image">
             <Setter Property="Padding" Value="0" />
             <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
             <Setter Property="CornerRadius" Value="0" />
+            <Setter Property="MinHeight" Value="0" />
             <Setter Property="HorizontalAlignment" Value="Stretch" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        </Style>
+        <Style Selector="Button.image:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="Button.image:pointerover Image">
+            <Setter Property="Opacity" Value="0.88" />
+        </Style>
+
+        <!-- Buttons on the dark photo viewer. -->
+        <Style Selector="Button.dark">
+            <Setter Property="Background" Value="#2C342D" />
+            <Setter Property="BorderBrush" Value="#435043" />
+            <Setter Property="Foreground" Value="{StaticResource ViewerTextBrush}" />
+        </Style>
+        <Style Selector="Button.dark:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#394339" />
+            <Setter Property="BorderBrush" Value="#566656" />
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+        <Style Selector="Button.dark:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#242B25" />
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+        <Style Selector="Button.dark:disabled /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#2C342D" />
+            <Setter Property="BorderBrush" Value="#435043" />
+            <Setter Property="Foreground" Value="{StaticResource ViewerTextBrush}" />
+        </Style>
+
+        <!-- Filter chips: Alle · Tomme (10) · Ravn (5) … -->
+        <Style Selector="ToggleButton.chip">
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="Padding" Value="14,6" />
+            <Setter Property="MinHeight" Value="36" />
+            <Setter Property="CornerRadius" Value="18" />
+            <Setter Property="Margin" Value="0,0,8,8" />
+            <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource ControlLineBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
             <Setter Property="Cursor" Value="Hand" />
         </Style>
+        <Style Selector="ToggleButton.chip:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource HoverBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource ControlLineBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+        </Style>
+        <Style Selector="ToggleButton.chip:checked /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource AccentBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+
+        <Style Selector="CheckBox">
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+
+        <Style Selector="TextBox, AutoCompleteBox">
+            <Setter Property="FontSize" Value="18" />
+        </Style>
+        <Style Selector="TextBox">
+            <Setter Property="Padding" Value="12,9" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="BorderBrush" Value="{StaticResource ControlLineBrush}" />
+            <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+        </Style>
+
         <Style Selector="ProgressBar">
-            <Setter Property="Height" Value="14" />
-            <Setter Property="MinHeight" Value="14" />
-            <Setter Property="Foreground" Value="#2E5634" />
+            <Setter Property="Height" Value="12" />
+            <Setter Property="MinHeight" Value="12" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+            <Setter Property="Background" Value="{StaticResource SunkenBrush}" />
+        </Style>
+
+        <!-- Always-visible scrollbars: a bar that only appears on hover hides that there is more below. -->
+        <Style Selector="ScrollViewer">
+            <Setter Property="AllowAutoHide" Value="False" />
+        </Style>
+
+        <!-- The step indicator at the top of the flow. -->
+        <Style Selector="Border.step">
+            <Setter Property="Width" Value="28" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="CornerRadius" Value="14" />
+            <Setter Property="BorderThickness" Value="2" />
+            <Setter Property="BorderBrush" Value="{StaticResource ControlLineBrush}" />
+            <Setter Property="Background" Value="{StaticResource PageBrush}" />
+        </Style>
+        <Style Selector="Border.step.current, Border.step.done">
+            <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+            <Setter Property="Background" Value="{StaticResource AccentBrush}" />
+        </Style>
+        <Style Selector="Border.step TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+        </Style>
+        <Style Selector="Border.step.current TextBlock">
+            <Setter Property="Foreground" Value="White" />
         </Style>
     </Application.Styles>
 </Application>

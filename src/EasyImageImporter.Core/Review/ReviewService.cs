@@ -210,7 +210,7 @@ public sealed class ReviewService(ImportStore store, AppPaths paths)
     /// <summary>Everything needed before saving: every place has a name.</summary>
     public bool IsReadyToSave(long sessionId) => GetOverview(sessionId).Places.All(p => p.IsNamed);
 
-    /// <summary>"Nytt sted fra denne hendelsen": this visit and the later ones at its place become a new place.</summary>
+    /// <summary>"Nytt sted fra denne bildeserien": this visit and the later ones at its place become a new place.</summary>
     public void StartNewPlace(Place place, Visit from)
     {
         var index = place.Visits.ToList().FindIndex(v => v.Id == from.Id);

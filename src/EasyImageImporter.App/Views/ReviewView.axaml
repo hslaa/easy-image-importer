@@ -4,137 +4,163 @@
              x:Class="EasyImageImporter.App.Views.ReviewView"
              x:DataType="review:ReviewScreen">
 
-    <DockPanel Margin="32,28">
-        <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto">
-            <StackPanel Spacing="6">
+    <DockPanel>
+        <!-- Stays in place: where you are, and the way on. Everything else scrolls, so the photos get the room. -->
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="32,20,32,14">
+            <StackPanel Spacing="2">
                 <TextBlock Classes="title" Text="Gå gjennom bildene" />
-                <TextBlock Text="{Binding Summary}" />
+                <TextBlock Classes="muted" Text="{Binding Summary}" />
             </StackPanel>
-            <Button Grid.Column="1" Classes="primary" Content="Neste: navn og tagger →" Command="{Binding NextCommand}"
-                    VerticalAlignment="Top" />
-        </Grid>
-
-        <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="0,12,0,0">
-            <StackPanel Orientation="Horizontal" Spacing="12"
-                        IsVisible="{Binding FailedText, Converter={x:Static ObjectConverters.IsNotNull}}">
-                <TextBlock Classes="warning" Text="{Binding FailedText}" VerticalAlignment="Center" />
-                <Button Content="Prøv igjen" Command="{Binding RetryCommand}" />
-            </StackPanel>
-            <TextBlock Classes="muted" Text="{Binding AlreadyImportedText}"
-                       IsVisible="{Binding AlreadyImportedText, Converter={x:Static ObjectConverters.IsNotNull}}" />
-            <TextBlock Classes="muted" Text="{Binding VideosText}"
-                       IsVisible="{Binding VideosText, Converter={x:Static ObjectConverters.IsNotNull}}" />
-            <TextBlock Classes="muted"
-                       Text="Alt blir lagret, med mindre du sorterer det bort. Trykk på en hendelse for å se alle bildene i den." />
-
-            <!-- Animal recognition: offered once, then quietly at work in the background. -->
-            <Border Background="#E7EFE3" CornerRadius="10" Padding="16,12" Margin="0,6,0,0"
-                    IsVisible="{Binding Recognition.IsVisible}">
-                <StackPanel Spacing="8">
-                    <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding Recognition.IsOffered}">
-                        <StackPanel Spacing="2">
-                            <TextBlock FontWeight="SemiBold" Text="Finn dyr og tomme bilder automatisk" />
-                            <TextBlock FontSize="15" Classes="muted"
-                                       Text="Appen kan foreslå hvilke dyr som er på bildene, og finne bilder uten dyr. Du bestemmer alltid selv. Det krever en nedlasting, én gang." />
-                        </StackPanel>
-                        <Button Grid.Column="1" Classes="primary" Command="{Binding Recognition.DownloadCommand}"
-                                Content="{Binding Recognition.DownloadSize, StringFormat='Last ned ({0})'}"
-                                VerticalAlignment="Center" Margin="12,0,0,0" />
-                    </Grid>
-                    <StackPanel Spacing="6" IsVisible="{Binding Recognition.IsBusy}">
-                        <TextBlock FontSize="15" Text="{Binding Recognition.Text}" />
-                        <ProgressBar Value="{Binding Recognition.Progress}" Maximum="100" />
-                    </StackPanel>
-                    <StackPanel Orientation="Horizontal" Spacing="12" IsVisible="{Binding Recognition.IsFailed}">
-                        <TextBlock Classes="warning" FontSize="15" Text="{Binding Recognition.Text}" VerticalAlignment="Center" />
-                        <Button Content="Prøv igjen" Command="{Binding Recognition.DownloadCommand}" />
-                    </StackPanel>
-                    <TextBlock FontSize="15" Classes="muted" Text="{Binding Recognition.Text}"
-                               IsVisible="{Binding !Recognition.IsBusy}" />
+            <Button Grid.Column="1" Classes="primary" Command="{Binding NextCommand}" VerticalAlignment="Center" Margin="16,0,0,0">
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <TextBlock Text="Neste: navn og merking" />
+                    <Path Classes="icon" Data="{StaticResource IconForward}" />
                 </StackPanel>
-            </Border>
+            </Button>
+        </Grid>
+        <Border DockPanel.Dock="Top" Height="1" Background="{StaticResource LineBrush}" />
 
-            <!-- Alle · Ravn (5) · Kråkefugl (3) · Tomme (12) · Usikre (4) -->
-            <ItemsControl ItemsSource="{Binding Filters}" IsVisible="{Binding HasFilters}" Margin="0,4,0,0">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate DataType="review:FilterChip">
-                        <ToggleButton Content="{Binding Text}" IsChecked="{Binding IsSelected, Mode=OneWay}"
-                                      Command="{Binding SelectCommand}" FontSize="15" Padding="14,6"
-                                      CornerRadius="16" Margin="0,0,8,8" />
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-            <TextBlock Classes="muted" FontSize="15" Text="{Binding FilterText}"
-                       IsVisible="{Binding FilterText, Converter={x:Static ObjectConverters.IsNotNull}}" />
-        </StackPanel>
+        <ScrollViewer>
+            <StackPanel Margin="32,18,20,24" Spacing="12">
+                <Border Classes="note" Background="{StaticResource DangerSoftBrush}"
+                        IsVisible="{Binding FailedText, Converter={x:Static ObjectConverters.IsNotNull}}">
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                        <Path Classes="icon" Data="{StaticResource IconWarning}" Stroke="{StaticResource DangerBrush}" />
+                        <TextBlock Grid.Column="1" Classes="warning" Text="{Binding FailedText}" VerticalAlignment="Center" />
+                        <Button Grid.Column="2" Content="Prøv igjen" Command="{Binding RetryCommand}" />
+                    </Grid>
+                </Border>
 
-        <!-- Rows of three, virtualized: only the rows on screen are created. -->
-        <ScrollViewer Margin="0,16,0,0">
-            <ItemsControl ItemsSource="{Binding Rows}">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <VirtualizingStackPanel />
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.DataTemplates>
-                    <DataTemplate DataType="review:PlaceHeader">
-                        <Grid ColumnDefinitions="*,Auto" Margin="0,12,14,12">
-                            <StackPanel Spacing="2">
-                                <TextBlock Text="{Binding Name}" FontSize="22" FontWeight="SemiBold" />
-                                <TextBlock Classes="muted" FontSize="15" Text="{Binding Details}" />
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Alt blir lagret, med mindre du sorterer det bort. Trykk på et bilde for å se hele bildeserien." />
+                    <TextBlock Classes="small muted" Text="{Binding NoteText}"
+                               IsVisible="{Binding NoteText, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                </StackPanel>
+
+                <!-- Animal recognition: offered once, then quietly at work in the background. -->
+                <Border Classes="note" IsVisible="{Binding Recognition.IsVisible}">
+                    <StackPanel Spacing="8">
+                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12" IsVisible="{Binding Recognition.IsOffered}">
+                            <Path Classes="icon" Data="{StaticResource IconSparkle}" Stroke="{StaticResource AccentBrush}"
+                                  VerticalAlignment="Top" Margin="0,2,0,0" />
+                            <StackPanel Grid.Column="1" Spacing="2">
+                                <TextBlock Classes="strong" Text="Finn dyr og tomme bilder automatisk" />
+                                <TextBlock Classes="small muted"
+                                           Text="Appen kan foreslå hvilke dyr som er på bildene, og finne bilder uten dyr. Du bestemmer alltid selv. Det krever en nedlasting, én gang." />
                             </StackPanel>
-                            <Button Grid.Column="1" Classes="link" FontSize="15" Content="Samme sted som over"
-                                    Command="{Binding MergeWithAboveCommand}" IsVisible="{Binding CanMerge}"
-                                    VerticalAlignment="Bottom" />
+                            <Button Grid.Column="2" Command="{Binding Recognition.DownloadCommand}"
+                                    Content="{Binding Recognition.DownloadSize, StringFormat='Last ned ({0})'}"
+                                    VerticalAlignment="Center" />
                         </Grid>
-                    </DataTemplate>
-                    <DataTemplate DataType="review:VisitRow">
-                        <ItemsControl ItemsSource="{Binding Items}">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <UniformGrid Columns="3" />
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate DataType="review:VisitCard">
-                                    <Border Background="White" CornerRadius="10" Margin="0,0,14,14" ClipToBounds="True">
-                                        <StackPanel>
-                                            <Button Classes="image" Command="{Binding OpenCommand}" Opacity="{Binding Opacity}">
-                                                <Panel Height="190" Background="#DDD8CC">
-                                                    <Image Source="{Binding Cover.Image}" Stretch="UniformToFill" />
-                                                </Panel>
-                                            </Button>
-                                            <StackPanel Spacing="2" Margin="14,10,14,12">
-                                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
-                                                <TextBlock Classes="muted" FontSize="15" Text="{Binding Details}" />
-                                                <TextBlock Classes="muted" FontSize="15" Text="Ser tom ut" FontStyle="Italic"
-                                                           IsVisible="{Binding LooksEmpty}" />
-                                                <!-- Suggest and confirm: nothing happens until the user says yes. -->
-                                                <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,4,0,0" IsVisible="{Binding HasQuestion}">
-                                                    <TextBlock Text="{Binding Question}" FontWeight="SemiBold" FontSize="15"
-                                                               VerticalAlignment="Center" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
-                                                    <Button Grid.Column="1" Content="Ja" Command="{Binding AcceptCommand}"
-                                                            FontSize="15" Padding="12,4" Margin="6,0,0,0" />
-                                                    <Button Grid.Column="2" Content="Nei" Command="{Binding DismissCommand}"
-                                                            FontSize="15" Padding="12,4" Margin="6,0,0,0" />
-                                                </Grid>
-                                                <Grid ColumnDefinitions="*,Auto" Margin="0,6,0,0">
-                                                    <TextBlock FontSize="15" Text="{Binding KeepText}" VerticalAlignment="Center" />
-                                                    <Button Grid.Column="1" Classes="link" FontSize="15"
-                                                            Content="{Binding ToggleText}" Command="{Binding ToggleCommand}" />
-                                                </Grid>
-                                            </StackPanel>
-                                        </StackPanel>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </DataTemplate>
-                </ItemsControl.DataTemplates>
-            </ItemsControl>
+                        <StackPanel Spacing="8" IsVisible="{Binding Recognition.IsBusy}">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <Path Classes="icon" Data="{StaticResource IconSparkle}" Stroke="{StaticResource AccentBrush}" />
+                                <TextBlock Classes="small" Text="{Binding Recognition.Text}" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <ProgressBar Value="{Binding Recognition.Progress}" Maximum="100" />
+                        </StackPanel>
+                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12" IsVisible="{Binding Recognition.IsFailed}">
+                            <Path Classes="icon" Data="{StaticResource IconWarning}" Stroke="{StaticResource DangerBrush}" />
+                            <TextBlock Grid.Column="1" Classes="small warning" Text="{Binding Recognition.Text}" VerticalAlignment="Center" />
+                            <Button Grid.Column="2" Content="Prøv igjen" Command="{Binding Recognition.DownloadCommand}" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <StackPanel Spacing="10" IsVisible="{Binding HasFilters}">
+                    <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding Recognition.HasNote}">
+                        <Path Classes="icon" Data="{StaticResource IconSparkle}" Stroke="{StaticResource AccentBrush}"
+                              Width="18" Height="18" Stretch="Uniform" />
+                        <TextBlock Classes="small muted" Text="{Binding Recognition.Text}" VerticalAlignment="Center" />
+                    </StackPanel>
+
+                    <!-- Alle · Tomme (10) · Usikre (1) · Hjortedyr (13) … -->
+                    <ItemsControl ItemsSource="{Binding Filters}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="review:FilterChip">
+                                <ToggleButton Classes="chip" Content="{Binding Text}" IsChecked="{Binding IsSelected, Mode=OneWay}"
+                                              Command="{Binding SelectCommand}" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <WrapPanel IsVisible="{Binding FilterText, Converter={x:Static ObjectConverters.IsNotNull}}">
+                        <TextBlock Classes="small muted" Text="{Binding FilterText}" VerticalAlignment="Center" Margin="0,0,16,0" />
+                        <Button Content="{Binding DiscardShownText}" Command="{Binding DiscardShownCommand}"
+                                IsVisible="{Binding CanDiscardShown}" />
+                    </WrapPanel>
+                </StackPanel>
+
+                <!-- Rows of three, virtualized: only the rows on screen are created. -->
+                <ItemsControl ItemsSource="{Binding Rows}" Margin="0,4,0,0">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <VirtualizingStackPanel />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.DataTemplates>
+                        <DataTemplate DataType="review:PlaceHeader">
+                            <Grid ColumnDefinitions="*,Auto" Margin="0,14,16,12">
+                                <StackPanel Spacing="2">
+                                    <TextBlock Classes="heading" Text="{Binding Name}" />
+                                    <TextBlock Classes="small muted" Text="{Binding Details}" />
+                                </StackPanel>
+                                <Button Grid.Column="1" Classes="link" Content="Samme sted som over"
+                                        Command="{Binding MergeWithAboveCommand}" IsVisible="{Binding CanMerge}"
+                                        VerticalAlignment="Bottom" />
+                            </Grid>
+                        </DataTemplate>
+                        <DataTemplate DataType="review:VisitRow">
+                            <ItemsControl ItemsSource="{Binding Items}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <UniformGrid Columns="3" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="review:VisitCard">
+                                        <Border Classes="card" Margin="0,0,16,16" ClipToBounds="True">
+                                            <DockPanel>
+                                                <Button DockPanel.Dock="Top" Classes="image" Command="{Binding OpenCommand}"
+                                                        ToolTip.Tip="Se alle bildene i bildeserien">
+                                                    <Panel Height="176" Background="{StaticResource PlaceholderBrush}">
+                                                        <Image Source="{Binding Cover.Image}" Stretch="UniformToFill"
+                                                               Opacity="{Binding Opacity}" />
+                                                        <Border Background="#D91E231F" CornerRadius="6" Padding="8,3"
+                                                                Margin="10" HorizontalAlignment="Left" VerticalAlignment="Top"
+                                                                IsVisible="{Binding LooksEmpty}">
+                                                            <TextBlock Classes="caption" Text="Ser tom ut" Foreground="White" />
+                                                        </Border>
+                                                    </Panel>
+                                                </Button>
+                                                <StackPanel Margin="16,12,16,14" Spacing="2">
+                                                    <TextBlock Classes="strong" Text="{Binding Title}"
+                                                               TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Classes="small muted" Text="{Binding Details}" />
+                                                    <!-- Suggest and confirm: nothing happens until the user says yes. -->
+                                                    <Border Classes="note" Padding="12,6,6,6" Margin="0,8,0,0" IsVisible="{Binding HasQuestion}">
+                                                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6">
+                                                            <TextBlock Classes="small strong" Text="{Binding Question}" VerticalAlignment="Center"
+                                                                       TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
+                                                            <Button Grid.Column="1" Classes="compact" Content="Ja" Command="{Binding AcceptCommand}" />
+                                                            <Button Grid.Column="2" Classes="compact" Content="Nei" Command="{Binding DismissCommand}" />
+                                                        </Grid>
+                                                    </Border>
+                                                    <CheckBox Margin="0,6,0,0" IsChecked="{Binding KeepState, Mode=OneWay}"
+                                                              Command="{Binding ToggleCommand}" Content="{Binding KeepLabel}" />
+                                                </StackPanel>
+                                            </DockPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </DataTemplate>
+                    </ItemsControl.DataTemplates>
+                </ItemsControl>
+            </StackPanel>
         </ScrollViewer>
     </DockPanel>
 </UserControl>
