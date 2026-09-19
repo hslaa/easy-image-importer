@@ -9,7 +9,11 @@ public sealed record SequenceInput(long FileId, DateTime TakenAt, string? Camera
 /// </summary>
 public static class SequenceBuilder
 {
-    public static readonly TimeSpan DefaultGap = TimeSpan.FromMinutes(3);
+    /// <summary>
+    /// Long enough that an animal feeding at the bait with pauses stays one visit. On the real test
+    /// cards (tools/testdata) nothing mixes different animals up to 30 minutes; at 60 it starts to.
+    /// </summary>
+    public static readonly TimeSpan DefaultGap = TimeSpan.FromMinutes(30);
 
     public static IReadOnlyList<IReadOnlyList<long>> Build(IEnumerable<SequenceInput> images, TimeSpan? gap = null)
     {

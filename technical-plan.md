@@ -144,7 +144,7 @@ Everything the UI shows is recoverable from this DB plus the files. Schema migra
 
 ### 4.1 Hendelse (sequence), M3
 
-- Sort by `taken_at` within a camera. Start a new sequence when the gap exceeds a threshold (start at **3 min**, tune on real cards).
+- Sort by `taken_at` within a camera. Start a new sequence when the camera was quiet for more than **30 min** (chosen on the real test cards: repeat triggers of one animal are joined, and nothing mixes different animals until about 60 min).
 - **Bad clocks:** detect obviously reset clocks (year < 2015, time going backwards against file-number order, clusters at `2000-01-01`). Fall back to camera file-number order, with gaps inferred from the file mtime, and show the date span as "ukjent" so he can fix it.
 - A sequence shows as one card: representative thumbnail, count, time span, and an optional species label he can type (autocompletes from earlier labels). In v1 that manual label is what feeds species tags and the species part of file names; without a label that part is left out. Split and merge are cheap DB operations.
 
