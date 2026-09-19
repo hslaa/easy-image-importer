@@ -32,6 +32,9 @@ public interface IFileSystem
 
     void Delete(string path);
 
+    /// <summary>Removes the folder if it is empty. Returns false (and leaves it) if it isn't.</summary>
+    bool DeleteDirectoryIfEmpty(string path);
+
     /// <summary>Writes a small text file, replacing any existing one.</summary>
     void WriteAllText(string path, string contents, System.Text.Encoding encoding);
 

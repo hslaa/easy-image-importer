@@ -9,6 +9,7 @@
                 <TrayIcon.Menu>
                     <NativeMenu>
                         <NativeMenuItem Header="Åpne" Click="OnOpenClicked" />
+                        <NativeMenuItem Header="Mine importer" Click="OnImportsClicked" />
                         <NativeMenuItemSeparator />
                         <NativeMenuItem Header="Avslutt" Click="OnQuitClicked" />
                     </NativeMenu>
@@ -59,9 +60,15 @@
             <Setter Property="Background" Value="#B4431A" />
             <Setter Property="Foreground" Value="White" />
         </Style>
+        <Style Selector="Button.link">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="#2E5634" />
+            <Setter Property="Padding" Value="4,8" />
+        </Style>
         <Style Selector="ProgressBar">
             <Setter Property="Height" Value="14" />
             <Setter Property="MinHeight" Value="14" />
+            <Setter Property="Foreground" Value="#2E5634" />
         </Style>
     </Application.Styles>
 </Application>

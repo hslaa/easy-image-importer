@@ -92,6 +92,13 @@ public sealed class ImportStore(Database db, TimeProvider? time = null)
         return result;
     }
 
+    /// <summary>
+    /// Files waiting in staging to be saved. Normally the Verified ones; after an undo, files that
+    /// were already erased from the card are back in staging as well.
+    /// </summary>
+    public IReadOnlyList<SessionFile> GetStagedFiles(long sessionId) =>
+        GetFiles(sessionId, FileStatus.Verified, FileStatus.Erased).Where(f => f.StagingName is not null).ToList();
+
     public FileCounts GetCounts(long sessionId)
     {
         using var c = db.Open();
@@ -170,8 +177,12 @@ public sealed class ImportStore(Database db, TimeProvider? time = null)
         return GetImportForSession(sessionId)!;
     }
 
+    /// <summary>The session's current import: the latest one that hasn't been undone.</summary>
     public ImportRecord? GetImportForSession(long sessionId) =>
-        QueryImports("WHERE session_id = $s", ("$s", sessionId)).FirstOrDefault();
+        QueryImports("WHERE session_id = $s AND undone_utc IS NULL ORDER BY id DESC LIMIT 1", ("$s", sessionId))
+            .FirstOrDefault();
+
+    public ImportRecord GetImport(long importId) => QueryImports("WHERE id = $i", ("$i", importId)).Single();
 
     public IReadOnlyList<ImportRecord> GetImports() =>
         QueryImports("WHERE undone_utc IS NULL ORDER BY created_utc DESC");
@@ -180,17 +191,46 @@ public sealed class ImportStore(Database db, TimeProvider? time = null)
     {
         using var c = db.Open();
         using var cmd = Command(c, null,
-            "SELECT import_id, file_id, from_path, to_path, done FROM import_moves WHERE import_id = $i ORDER BY file_id;",
+            "SELECT import_id, file_id, from_path, to_path, done, undone FROM import_moves WHERE import_id = $i ORDER BY file_id;",
             ("$i", importId));
         var result = new List<ImportMove>();
         using var r = cmd.ExecuteReader();
         while (r.Read())
-            result.Add(new ImportMove(r.GetInt64(0), r.GetInt64(1), r.GetString(2), r.GetString(3), r.GetInt64(4) != 0));
+            result.Add(new ImportMove(r.GetInt64(0), r.GetInt64(1), r.GetString(2), r.GetString(3),
+                r.GetInt64(4) != 0, r.GetInt64(5) != 0));
         return result;
     }
 
     public void MarkMoveDone(long importId, long fileId) =>
         Execute("UPDATE import_moves SET done = 1 WHERE import_id = $i AND file_id = $f;", ("$i", importId), ("$f", fileId));
+
+    public void MarkMoveUndone(long importId, long fileId) =>
+        Execute("UPDATE import_moves SET undone = 1 WHERE import_id = $i AND file_id = $f;", ("$i", importId), ("$f", fileId));
+
+    /// <summary>
+    /// Starts undoing an import: its files stop counting as archived (so nothing on the card can be
+    /// erased on their strength) and the session is marked Undoing, in one transaction.
+    /// </summary>
+    public void BeginUndo(long importId, long sessionId)
+    {
+        using var c = db.Open();
+        using var tx = c.BeginTransaction();
+        Execute(c, tx, "DELETE FROM known_files WHERE import_id = $i;", ("$i", importId));
+        Execute(c, tx, "UPDATE sessions SET state = $state, updated_utc = $now WHERE id = $s;",
+            ("$state", SessionState.Undoing.ToString()), ("$now", Now()), ("$s", sessionId));
+        tx.Commit();
+    }
+
+    /// <summary>Marks the import undone and puts the session back to "copied, ready to save".</summary>
+    public void CompleteUndo(long importId, long sessionId)
+    {
+        using var c = db.Open();
+        using var tx = c.BeginTransaction();
+        Execute(c, tx, "UPDATE imports SET undone_utc = $now WHERE id = $i;", ("$now", Now()), ("$i", importId));
+        Execute(c, tx, "UPDATE sessions SET state = $state, updated_utc = $now WHERE id = $s;",
+            ("$state", SessionState.Copied.ToString()), ("$now", Now()), ("$s", sessionId));
+        tx.Commit();
+    }
 
     /// <summary>Registers every moved file as known and marks the session Imported, atomically.</summary>
     public void CompleteImport(long importId, long sessionId)

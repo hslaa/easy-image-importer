@@ -16,7 +16,7 @@ public sealed class Finalizer(IFileSystem fs, ImportStore store, AppPaths paths,
 
     private static readonly CultureInfo Norwegian = CultureInfo.GetCultureInfo("nb-NO");
     private readonly TimeProvider _time = time ?? TimeProvider.System;
-    private readonly VerifiedCopier _copier = new(fs);
+    private readonly SafeMover _mover = new(fs);
 
     /// <summary>Returns the import, or null when every file was already archived before (nothing new to store).</summary>
     public ImportRecord? Run(long sessionId)
@@ -32,24 +32,33 @@ public sealed class Finalizer(IFileSystem fs, ImportStore store, AppPaths paths,
         if (import is null)
         {
             store.SetState(sessionId, SessionState.Imported);
+            MarkErasedIfCardIsEmpty(sessionId);
             return null;
         }
 
         fs.CreateDirectory(import.FolderPath);
         foreach (var move in store.GetMoves(import.Id).Where(m => !m.Done))
         {
-            MoveOne(move);
+            _mover.Move(move.FromPath, move.ToPath);
             store.MarkMoveDone(move.ImportId, move.FileId);
         }
 
         WriteSummary(import, session);
         store.CompleteImport(import.Id, sessionId);
+        MarkErasedIfCardIsEmpty(sessionId);
         return store.GetImportForSession(sessionId);
+    }
+
+    /// <summary>Saved again after an undo, with the card already erased: nothing is left to do.</summary>
+    private void MarkErasedIfCardIsEmpty(long sessionId)
+    {
+        var counts = store.GetCounts(sessionId);
+        if (counts.Erased > 0 && counts.Erased == counts.Total) store.SetState(sessionId, SessionState.CardErased);
     }
 
     private ImportRecord? Plan(Session session)
     {
-        var files = store.GetFiles(session.Id, FileStatus.Verified);
+        var files = store.GetStagedFiles(session.Id);
         if (files.Count == 0) return null;
 
         var today = _time.GetLocalNow();
@@ -67,30 +76,9 @@ public sealed class Finalizer(IFileSystem fs, ImportStore store, AppPaths paths,
         return store.CreateImportPlan(session.Id, folder, moves);
     }
 
-    private void MoveOne(ImportMove move)
-    {
-        // Already moved before a crash, but not yet recorded.
-        if (!fs.FileExists(move.FromPath) && fs.FileExists(move.ToPath)) return;
-
-        if (fs.IsSameVolume(move.FromPath, Path.GetDirectoryName(move.ToPath)!))
-        {
-            fs.Move(move.FromPath, move.ToPath);
-            return;
-        }
-
-        // Different disk: copy, prove the copy, then remove the staging file.
-        var temp = move.ToPath + ".tmp";
-        if (fs.FileExists(temp)) fs.Delete(temp);
-        var result = _copier.Copy(move.FromPath, temp);
-        if (result.Status != CopyStatus.Verified)
-            throw new IOException($"Kopien av {Path.GetFileName(move.ToPath)} kunne ikke kontrolleres.");
-        fs.Move(temp, move.ToPath);
-        fs.Delete(move.FromPath);
-    }
-
     private void WriteSummary(ImportRecord import, Session session)
     {
-        var files = store.GetFiles(session.Id, FileStatus.Verified);
+        var files = store.GetStagedFiles(session.Id);
         var first = files.Min(f => f.MtimeUtc).ToLocalTime();
         var last = files.Max(f => f.MtimeUtc).ToLocalTime();
         var text = new StringBuilder()

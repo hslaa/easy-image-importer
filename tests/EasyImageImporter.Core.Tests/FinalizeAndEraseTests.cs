@@ -62,7 +62,7 @@ public sealed class FinalizeAndEraseTests : IDisposable
         Assert.Throws<SimulatedCrashException>(() => _env.Finalizer.Run(session.Id));
         Assert.Equal(SessionState.Finalizing, _env.Store.GetSession(session.Id).State);
 
-        new Recovery(_env.Store, _env.Finalizer).Run();
+        _env.Recovery.Run();
 
         Assert.Equal(SessionState.Imported, _env.Store.GetSession(session.Id).State);
         Assert.Equal(6, _env.ArchivedFiles().Count()); // 5 images + summary
@@ -216,7 +216,7 @@ public sealed class FinalizeAndEraseTests : IDisposable
         _env.Copier.Run(session.Id);
         _env.Fs.CrashOnMove = 4;
         Assert.Throws<SimulatedCrashException>(() => _env.Finalizer.Run(session.Id));
-        new Recovery(_env.Store, _env.Finalizer).Run();
+        _env.Recovery.Run();
         _env.Eraser.Erase(session.Id);
 
         var archived = _env.ArchivedFiles().Where(p => p.EndsWith(".JPG"))

@@ -19,6 +19,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private readonly CopyEngine _copier;
     private readonly Finalizer _finalizer;
     private readonly CardEraser _eraser;
+    private readonly ImportUndo _undo;
     private readonly Recovery _recovery;
     private readonly CardWatcher _watcher = new(new SystemDriveProvider());
 
@@ -33,6 +34,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     [ObservableProperty] private Screen _screen;
 
+    /// <summary>"Mine importer", shown on top of the flow without interrupting it.</summary>
+    [ObservableProperty] private ImportsScreen? _overlay;
+
     public MainViewModel()
     {
         var paths = Platform.Paths();
@@ -42,7 +46,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _copier = new CopyEngine(fs, _store, paths);
         _finalizer = new Finalizer(fs, _store, paths);
         _eraser = new CardEraser(fs, _store);
-        _recovery = new Recovery(_store, _finalizer);
+        _undo = new ImportUndo(fs, _store, paths);
+        _recovery = new Recovery(_store, _finalizer, _undo);
         Screen = Idle();
     }
 
@@ -112,6 +117,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             SessionState.Copying or SessionState.PausedCardMissing or SessionState.PausedDiskFull => CopyAsync(session),
             SessionState.Copied => ShowCopiedAsync(session),
             SessionState.Finalizing => SaveAsync(session),
+            SessionState.Undoing => UndoAsync(_store.GetImportForSession(session.Id)!.Id),
             SessionState.Imported => ShowDoneAsync(session),
             _ => ShowIdleAsync(),
         };
@@ -162,7 +168,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private Task ShowCopiedAsync(Session session)
     {
         var counts = _store.GetCounts(session.Id);
-        Show(new CopiedScreen(counts.Verified, counts.Duplicate, counts.Failed,
+        Show(new CopiedScreen(_store.GetStagedFiles(session.Id).Count, counts.Duplicate, counts.Failed,
             save: () => RunGuardedAsync(() => SaveAsync(session)),
             retry: () => RunGuardedAsync(() =>
             {
@@ -184,8 +190,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         var import = _store.GetImportForSession(session.Id);
         var decision = _eraser.Evaluate(session.Id);
-        Show(new DoneScreen(import?.FolderPath, import?.ImageCount ?? 0, decision.Count, decision.Reason,
-            erase: () => RunGuardedAsync(() => EraseAsync(session))));
+        var canUndo = import is not null && _undo.Evaluate(import.Id).Allowed;
+        Show(new DoneScreen(import?.FolderPath, import?.ImageCount ?? 0, decision.Count, decision.Reason, canUndo,
+            erase: () => RunGuardedAsync(() => EraseAsync(session)),
+            undo: () => RunGuardedAsync(() => UndoAsync(import!.Id))));
         return Task.CompletedTask;
     }
 
@@ -213,6 +221,27 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         });
     }
 
+    /// <summary>Moves an import back to "copied, ready to save". Nothing is deleted.</summary>
+    private async Task UndoAsync(long importId)
+    {
+        Overlay = null;
+        Show(Working("Angrer importen…"));
+        await Task.Run(() => _undo.Run(importId));
+        var import = _store.GetImport(importId);
+        Log.Information("Import {Import} undone", importId);
+        await ContinueAsync(_store.GetSession(import.SessionId));
+    }
+
+    public void ShowImports()
+    {
+        var rows = _store.GetImports().Select(import => new ImportRow(
+            import.FolderPath, import.CreatedUtc, import.ImageCount,
+            folderExists: Directory.Exists(import.FolderPath),
+            canUndo: !_busy && _undo.Evaluate(import.Id).Allowed,
+            undo: () => _busy ? Task.CompletedTask : RunGuardedAsync(() => UndoAsync(import.Id)))).ToList();
+        Overlay = new ImportsScreen(rows, close: () => Overlay = null);
+    }
+
     /// <summary>Runs one step at a time, and turns surprises into a calm message instead of a crash.</summary>
     private async Task RunGuardedAsync(Func<Task> step)
     {
@@ -237,7 +266,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     private static WorkingScreen Working(string title, string detail = "") => new() { Title = title, Detail = detail };
 
-    private IdleScreen Idle() => new(ChooseFolderAsync);
+    private IdleScreen Idle() => new(ChooseFolderAsync, ShowImports);
 
     private async Task ChooseFolderAsync()
     {

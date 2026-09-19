@@ -29,6 +29,8 @@ public sealed class TestEnv : IDisposable
     public CopyEngine Copier => new(Fs, Store, Paths) { RetryDelay = TimeSpan.Zero };
     public Finalizer Finalizer => new(Fs, Store, Paths, Time);
     public CardEraser Eraser => new(Fs, Store);
+    public ImportUndo Undo => new(Fs, Store, Paths, Time);
+    public Recovery Recovery => new(Store, Finalizer, Undo);
 
     /// <summary>Writes a random "image" to the card and returns its bytes.</summary>
     public byte[] AddCardFile(string relPath, int size = 50_000)
@@ -133,6 +135,7 @@ public sealed class FaultyFileSystem : IFileSystem
         ThrowIfPulled(path);
         _inner.Delete(path);
     }
+    public bool DeleteDirectoryIfEmpty(string path) => _inner.DeleteDirectoryIfEmpty(path);
     public void WriteAllText(string path, string contents, Encoding encoding) => _inner.WriteAllText(path, contents, encoding);
     public long GetAvailableFreeSpace(string path) => FreeSpaceOverride ?? _inner.GetAvailableFreeSpace(path);
     public bool IsSameVolume(string pathA, string pathB) => _inner.IsSameVolume(pathA, pathB);

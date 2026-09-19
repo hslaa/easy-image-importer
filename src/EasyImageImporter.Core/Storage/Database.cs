@@ -8,7 +8,7 @@ namespace EasyImageImporter.Core.Storage;
 /// </summary>
 public sealed class Database
 {
-    private static readonly string[] Migrations =
+    internal static readonly string[] Migrations =
     [
         """
         CREATE TABLE sessions(
@@ -63,6 +63,25 @@ public sealed class Database
             final_path TEXT NOT NULL
         );
         """,
+        // 2: an import can be undone and the session saved again, so a session may have several
+        // imports (only one not undone). Rebuilds imports without UNIQUE(session_id).
+        """
+        CREATE TABLE imports_new(
+            id          INTEGER PRIMARY KEY,
+            session_id  INTEGER NOT NULL REFERENCES sessions(id),
+            folder_path TEXT NOT NULL,
+            created_utc TEXT NOT NULL,
+            image_count INTEGER NOT NULL DEFAULT 0,
+            undone_utc  TEXT
+        );
+        INSERT INTO imports_new(id, session_id, folder_path, created_utc, image_count, undone_utc)
+            SELECT id, session_id, folder_path, created_utc, image_count, undone_utc FROM imports;
+        DROP TABLE imports;
+        ALTER TABLE imports_new RENAME TO imports;
+        CREATE INDEX ix_imports_session ON imports(session_id);
+
+        ALTER TABLE import_moves ADD COLUMN undone INTEGER NOT NULL DEFAULT 0;
+        """,
     ];
 
     private readonly string _connectionString;
@@ -90,7 +109,16 @@ public sealed class Database
 
     private void Migrate()
     {
-        using var connection = Open();
+        // Foreign keys must be off while tables are rebuilt (SQLite's documented procedure),
+        // and can only be switched outside a transaction. Checked again before committing.
+        using var connection = new SqliteConnection(_connectionString);
+        connection.Open();
+        using (var off = connection.CreateCommand())
+        {
+            off.CommandText = "PRAGMA foreign_keys=OFF;";
+            off.ExecuteNonQuery();
+        }
+
         using var read = connection.CreateCommand();
         read.CommandText = "PRAGMA user_version;";
         var version = Convert.ToInt32(read.ExecuteScalar());
@@ -102,6 +130,14 @@ public sealed class Database
             migrate.Transaction = tx;
             migrate.CommandText = Migrations[i] + $"\nPRAGMA user_version = {i + 1};";
             migrate.ExecuteNonQuery();
+
+            using var check = connection.CreateCommand();
+            check.Transaction = tx;
+            check.CommandText = "PRAGMA foreign_key_check;";
+            using (var problems = check.ExecuteReader())
+            {
+                if (problems.Read()) throw new InvalidOperationException($"Migration {i + 1} broke a foreign key.");
+            }
             tx.Commit();
         }
     }
