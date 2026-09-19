@@ -142,7 +142,7 @@ Everything the UI shows is recoverable from this DB plus the files. Schema migra
 
 ## 4. Grouping
 
-### 4.1 Hendelse (sequence), M3
+### 4.1 Hendelse (sequence, «bildeserie» in the app), M3
 
 - Sort by `taken_at` within a camera. Start a new sequence when the camera was quiet for more than **30 min** (chosen on the real test cards: repeat triggers of one animal are joined, and nothing mixes different animals until about 60 min).
 - **Bad clocks:** detect obviously reset clocks (year < 2015, time going backwards against file-number order, clusters at `2000-01-01`). Fall back to camera file-number order, with gaps inferred from the file mtime, and show the date span as "ukjent" so he can fix it.

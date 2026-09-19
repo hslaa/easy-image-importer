@@ -50,7 +50,7 @@ public sealed partial class AnimalRecognition : ObservableObject, IDisposable
     public bool IsFailed => Status == RecognitionStatus.DownloadFailed;
     /// <summary>The panel: offering the download, or at work.</summary>
     public bool IsVisible => Status != RecognitionStatus.Done;
-    /// <summary>Finished, with a word about it ("Alle hendelsene er sjekket").</summary>
+    /// <summary>Finished, with a word about it ("Alle bildeseriene er sjekket").</summary>
     public bool HasNote => Status == RecognitionStatus.Done && Text.Length > 0;
 
     [RelayCommand]
@@ -115,7 +115,7 @@ public sealed partial class AnimalRecognition : ObservableObject, IDisposable
             {
                 if (ct.IsCancellationRequested) return;
                 Progress = 100.0 * p.VisitsDone / Math.Max(1, p.VisitsTotal);
-                Text = WithTimeLeft($"Ser etter dyr … {p.VisitsDone:N0} av {p.VisitsTotal:N0} hendelser",
+                Text = WithTimeLeft($"Ser etter dyr … {p.VisitsDone:N0} av {p.VisitsTotal:N0} bildeserier",
                     TimeLeft.Estimate(clock.Elapsed, p.FramesAnalysed, p.FramesLeft));
                 if (p.VisitId is { } id) VisitAnalysed?.Invoke(id);
             }));
@@ -124,7 +124,7 @@ public sealed partial class AnimalRecognition : ObservableObject, IDisposable
             {
                 if (ct.IsCancellationRequested) return;
                 Status = RecognitionStatus.Done;
-                Text = "Alle hendelsene er sjekket for dyr. Forslagene er bare forslag – du bestemmer.";
+                Text = "Alle bildeseriene er sjekket for dyr. Forslagene er bare forslag – du bestemmer.";
             });
         }
         catch (OperationCanceledException)

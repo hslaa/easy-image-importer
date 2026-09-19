@@ -135,7 +135,7 @@ public sealed class ReviewFlow
 
         var shownCount = overview.Visits.Count(Shown);
         var screen = new ReviewScreen(overview, rows, filters,
-            _filter == AllFilter ? null : $"Viser {shownCount:N0} av {overview.Visits.Count:N0} hendelser.",
+            _filter == AllFilter ? null : $"Viser {shownCount:N0} av {overview.Visits.Count:N0} bildeserier.",
             recognition,
             alreadyImportedText: counts.Duplicate == 0 ? null
                 : $"{counts.Duplicate:N0} av bildene var importert fra før og blir hoppet over.",

@@ -15,7 +15,7 @@ public sealed partial class PlaceHeader(Place place, Action? mergeWithAbove)
     public string Name { get; } = place.Name;
     public string Details { get; } =
         $"{Rows.DateRangeText(place.Start, place.End)} · {place.Visits.Count:N0} " +
-        $"{(place.Visits.Count == 1 ? "hendelse" : "hendelser")}, {Rows.Count(place.ImageCount)}";
+        $"{(place.Visits.Count == 1 ? "bildeserie" : "bildeserier")}, {Rows.Count(place.ImageCount)}";
     public bool CanMerge => mergeWithAbove is not null;
 
     [RelayCommand]
@@ -76,14 +76,14 @@ public sealed partial class ReviewScreen(
         OnPropertyChanged(nameof(CanDiscardShown));
     }
 
-    /// <summary>"Viser 12 av 60 hendelser" while a filter is on.</summary>
+    /// <summary>"Viser 12 av 60 bildeserier" while a filter is on.</summary>
     public string? FilterText { get; } = filterText;
 
     public AnimalRecognition Recognition { get; } = recognition;
 
     public string Summary =>
         $"{Review.Rows.Count(_overview.ImageCount)} i {_overview.Visits.Count:N0} " +
-        $"{(_overview.Visits.Count == 1 ? "hendelse" : "hendelser")}" +
+        $"{(_overview.Visits.Count == 1 ? "bildeserie" : "bildeserier")}" +
         (_overview.Places.Count > 1 ? $" på {_overview.Places.Count:N0} steder." : ".") +
         (_overview.KeptCount == _overview.ImageCount ? ""
             : $" {_overview.ImageCount - _overview.KeptCount:N0} av dem sorteres bort.");
@@ -106,8 +106,8 @@ public sealed partial class ReviewScreen(
     private int _shownToDiscard;
     public bool CanDiscardShown => discardShown is not null && _shownToDiscard > 0;
     public string DiscardShownText => _shownToDiscard == 1
-        ? "Sorter bort den tomme hendelsen"
-        : $"Sorter bort alle {_shownToDiscard:N0} tomme hendelser";
+        ? "Sorter bort den tomme bildeserien"
+        : $"Sorter bort alle {_shownToDiscard:N0} tomme bildeserier";
 
     [RelayCommand]
     private void DiscardShown() => discardShown?.Invoke();
@@ -143,7 +143,7 @@ public sealed partial class VisitCard(
     public LazyThumbnail Cover { get; } = cover;
 
     /// <summary>What's in it once the user has said so, otherwise just its number.</summary>
-    public string Title => _visit.Label ?? $"Hendelse {number}";
+    public string Title => _visit.Label ?? $"Bildeserie {number}";
     public string Details =>
         $"{Rows.DateText(_visit.Start)} kl. {Rows.TimeSpanText(_visit.Start, _visit.End)} · {Rows.Count(_visit.Frames.Count)}";
 
@@ -215,7 +215,7 @@ public sealed partial class VisitScreen : Screen
         CanUseSuggestion = visit.HasOpenSuggestion && visit.Suggestion?.Kind != SuggestionKind.Empty;
         Tiles = tiles;
         Rows = Review.Rows.Of(tiles, 4, items => new FrameRow(items));
-        Title = $"Hendelse {number} av {total}";
+        Title = $"Bildeserie {number} av {total}";
         Details = $"{placeName} · {Review.Rows.DateText(visit.Start)} · {Review.Rows.TimeSpanText(visit.Start, visit.End)} · {Review.Rows.Count(visit.Frames.Count)}";
         StartNewPlaceCommand = new RelayCommand(() => startNewPlace?.Invoke(), () => startNewPlace is not null);
         CanStartNewPlace = startNewPlace is not null;

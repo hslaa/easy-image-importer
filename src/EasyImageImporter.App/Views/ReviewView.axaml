@@ -32,7 +32,7 @@
                 </Border>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="Alt blir lagret, med mindre du sorterer det bort. Trykk på et bilde for å se hele hendelsen." />
+                    <TextBlock Text="Alt blir lagret, med mindre du sorterer det bort. Trykk på et bilde for å se hele bildeserien." />
                     <TextBlock Classes="small muted" Text="{Binding NoteText}"
                                IsVisible="{Binding NoteText, Converter={x:Static ObjectConverters.IsNotNull}}" />
                 </StackPanel>
@@ -125,7 +125,7 @@
                                         <Border Classes="card" Margin="0,0,16,16" ClipToBounds="True">
                                             <DockPanel>
                                                 <Button DockPanel.Dock="Top" Classes="image" Command="{Binding OpenCommand}"
-                                                        ToolTip.Tip="Se alle bildene i hendelsen">
+                                                        ToolTip.Tip="Se alle bildene i bildeserien">
                                                     <Panel Height="176" Background="{StaticResource PlaceholderBrush}">
                                                         <Image Source="{Binding Cover.Image}" Stretch="UniformToFill"
                                                                Opacity="{Binding Opacity}" />

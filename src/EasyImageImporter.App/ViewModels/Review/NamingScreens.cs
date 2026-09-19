@@ -64,12 +64,12 @@ public sealed partial class PlaceForm : ObservableObject
         _store = store;
         Heading = $"Sted {number}";
         Details = $"{Rows.DateRangeText(place.Start, place.End)} · {place.Visits.Count:N0} " +
-                  $"{(place.Visits.Count == 1 ? "hendelse" : "hendelser")}, {Rows.Count(place.ImageCount)}";
+                  $"{(place.Visits.Count == 1 ? "bildeserie" : "bildeserier")}, {Rows.Count(place.ImageCount)}";
         Covers = covers;
         RecognisedText = place.Details.RecognisedName is { } known ? $"Dette ser ut som {known}." : null;
         AnimalsText = place.Animals.Count > 0
             ? string.Join(", ", place.Animals)
-            : "Ingen dyr er merket ennå. Skriv hva som er på bildene i hver hendelse, eller svar «Ja» på forslagene.";
+            : "Ingen dyr er merket ennå. Skriv hva som er på bildene i hver bildeserie, eller svar «Ja» på forslagene.";
         TagSuggestions = tagSuggestions;
         Tags = new ObservableCollection<TagChip>(place.Details.Tags.Select(t => new TagChip(t, RemoveTag)));
         _title = place.Details.Title ?? "";

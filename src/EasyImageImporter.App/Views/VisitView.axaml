@@ -45,13 +45,13 @@
                     <TextBlock Classes="muted" Text="{Binding Details}" />
                 </StackPanel>
                 <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                    <Button Command="{Binding PreviousCommand}" ToolTip.Tip="Forrige hendelse">
+                    <Button Command="{Binding PreviousCommand}" ToolTip.Tip="Forrige bildeserie">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <Path Classes="icon" Data="{StaticResource IconBack}" />
                             <TextBlock Text="Forrige" />
                         </StackPanel>
                     </Button>
-                    <Button Command="{Binding NextCommand}" ToolTip.Tip="Neste hendelse">
+                    <Button Command="{Binding NextCommand}" ToolTip.Tip="Neste bildeserie">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <TextBlock Text="Neste" />
                             <Path Classes="icon" Data="{StaticResource IconForward}" />
@@ -129,9 +129,9 @@
                     <StackPanel Spacing="4" Margin="0,8,0,0">
                         <TextBlock Classes="small strong" Text="Er bildene gruppert feil?" />
                         <TextBlock Classes="small muted"
-                                   Text="For å dele hendelsen i to: åpne bildet der den nye skal begynne, og velg «Del hendelsen her»." />
+                                   Text="For å dele bildeserien i to: åpne bildet der den nye skal begynne, og velg «Del bildeserien her»." />
                         <WrapPanel Margin="-6,2,0,0">
-                            <Button Classes="link" FontSize="15" Content="Slå sammen med neste hendelse"
+                            <Button Classes="link" FontSize="15" Content="Slå sammen med neste bildeserie"
                                     Command="{Binding MergeWithNextCommand}" IsVisible="{Binding CanMergeWithNext}" Margin="0,0,12,0" />
                             <Button Classes="link" FontSize="15" Content="Flytt til et nytt sted (herfra og ut)"
                                     Command="{Binding StartNewPlaceCommand}" IsVisible="{Binding CanStartNewPlace}" />
@@ -150,8 +150,8 @@
                         <TextBlock Classes="caption" Text="Piltastene blar · mellomrom velger · Esc lukker" Foreground="#9AA597" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
-                        <Button Classes="dark" Content="Del hendelsen her" Command="{Binding Viewer.SplitHereCommand}"
-                                IsVisible="{Binding Viewer.CanSplit}" ToolTip.Tip="Gjør dette og bildene etter til en ny hendelse" />
+                        <Button Classes="dark" Content="Del bildeserien her" Command="{Binding Viewer.SplitHereCommand}"
+                                IsVisible="{Binding Viewer.CanSplit}" ToolTip.Tip="Gjør dette og bildene etter til en ny bildeserie" />
                         <Button Classes="dark" Command="{Binding Viewer.CloseCommand}" ToolTip.Tip="Lukk (Esc)">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <Path Classes="icon" Data="{StaticResource IconClose}" />
