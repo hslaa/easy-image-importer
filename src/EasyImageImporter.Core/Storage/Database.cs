@@ -112,6 +112,64 @@ public sealed class Database
         CREATE INDEX ix_site_groups_session ON site_groups(session_id);
         ALTER TABLE sequences ADD COLUMN site_group_id INTEGER REFERENCES site_groups(id);
         """,
+        // 5: naming. Places get the user's name, description, tags and folder name; an import can
+        // produce one folder per place; and named places are remembered between seasons by what
+        // their background looks like, so the next card from the same spot is recognised.
+        """
+        CREATE TABLE known_sites(
+            id            INTEGER PRIMARY KEY,
+            name          TEXT NOT NULL,
+            created_utc   TEXT NOT NULL,
+            last_used_utc TEXT NOT NULL
+        );
+        CREATE UNIQUE INDEX ux_known_sites_name ON known_sites(name COLLATE NOCASE);
+
+        CREATE TABLE known_site_scenes(
+            id                 INTEGER PRIMARY KEY,
+            known_site_id      INTEGER NOT NULL REFERENCES known_sites(id),
+            source_sequence_id INTEGER NOT NULL UNIQUE,
+            night              INTEGER NOT NULL,
+            edges              BLOB NOT NULL,
+            added_utc          TEXT NOT NULL
+        );
+        CREATE INDEX ix_known_site_scenes_site ON known_site_scenes(known_site_id);
+
+        -- The background of each visit, kept so places can be remembered without re-reading images.
+        CREATE TABLE visit_scenes(
+            sequence_id INTEGER PRIMARY KEY REFERENCES sequences(id),
+            night       INTEGER NOT NULL,
+            edges       BLOB NOT NULL
+        );
+
+        ALTER TABLE site_groups ADD COLUMN title TEXT;                 -- the user's name for the place
+        ALTER TABLE site_groups ADD COLUMN description TEXT;
+        ALTER TABLE site_groups ADD COLUMN folder_name TEXT;           -- null: use the suggestion
+        ALTER TABLE site_groups ADD COLUMN recognised_site_id INTEGER REFERENCES known_sites(id);
+
+        CREATE TABLE site_group_tags(
+            site_group_id INTEGER NOT NULL REFERENCES site_groups(id),
+            text          TEXT NOT NULL,
+            PRIMARY KEY (site_group_id, text)
+        );
+
+        -- Everything ever typed, for autocomplete. kind: tag | species.
+        CREATE TABLE vocabulary(
+            text TEXT NOT NULL,
+            kind TEXT NOT NULL,
+            PRIMARY KEY (text, kind)
+        );
+
+        CREATE TABLE import_folders(
+            import_id       INTEGER NOT NULL REFERENCES imports(id),
+            folder_path     TEXT NOT NULL,
+            site_group_id   INTEGER REFERENCES site_groups(id),
+            image_count     INTEGER NOT NULL,
+            discarded_count INTEGER NOT NULL,
+            PRIMARY KEY (import_id, folder_path)
+        );
+        INSERT INTO import_folders(import_id, folder_path, image_count, discarded_count)
+            SELECT id, folder_path, image_count, discarded_count FROM imports;
+        """,
     ];
 
     private readonly string _connectionString;

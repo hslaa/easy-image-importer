@@ -83,7 +83,7 @@ public sealed class UndoTests : IDisposable
     {
         _env.AddCardImages(3);
         var (session, import) = _env.ImportCard();
-        File.Delete(Path.Combine(import!.FolderPath, "IMAG0002.JPG"));
+        File.Delete(Directory.GetFiles(import!.FolderPath, "*.jpg").Order().ElementAt(1));
 
         var decision = _env.Undo.Evaluate(import.Id);
 

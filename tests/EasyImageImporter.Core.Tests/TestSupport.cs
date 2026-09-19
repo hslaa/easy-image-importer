@@ -61,10 +61,17 @@ public sealed class TestEnv : IDisposable
         return session;
     }
 
+    /// <summary>When the test cards' images were "taken": fixed, so folder names don't depend on today's date.</summary>
+    public static readonly DateTime TakenUtc = new(2026, 9, 18, 5, 12, 0, DateTimeKind.Utc);
+
     public void AddCardImages(int count, string folder = "DCIM/100MEDIA")
     {
-        for (var i = 1; i <= count; i++) AddCardFile($"{folder}/IMAG{i:0000}.JPG");
+        for (var i = 1; i <= count; i++) AddCardFile($"{folder}/IMAG{i:0000}.JPG", mtimeUtc: TakenUtc.AddSeconds(i * 5));
     }
+
+    /// <summary>Saved photos (not the summary), wherever they ended up in the archive.</summary>
+    public IEnumerable<string> ArchivedImages() =>
+        ArchivedFiles().Where(p => !p.EndsWith(Finalizer.SummaryFileName, StringComparison.Ordinal));
 
     public Session OpenSession() => Scanner.OpenSession(Scanner.Scan(Card), "SDCARD")!;
 

@@ -1,4 +1,5 @@
 using EasyImageImporter.Core.Import;
+using EasyImageImporter.Core.Naming;
 
 namespace EasyImageImporter.Core.Review;
 
@@ -11,11 +12,25 @@ public sealed record Visit(long Id, string? Label, long? SiteId, IReadOnlyList<S
 }
 
 /// <summary>A camera placement and its visits, in time order.</summary>
-public sealed record Place(long Id, string Name, IReadOnlyList<Visit> Visits)
+public sealed record Place(long Id, PlaceDetails Details, IReadOnlyList<Visit> Visits)
 {
+    /// <summary>The user's name, or "Sted 1" until there is one.</summary>
+    public string Name => Details.Title ?? Details.DefaultName;
+    public bool IsNamed => Details.Title is not null;
     public DateTime Start => Visits[0].Start;
     public DateTime End => Visits[^1].End;
     public int ImageCount => Visits.Sum(v => v.Frames.Count);
+
+    /// <summary>Animals labelled in the visits, most photographed first.</summary>
+    public IReadOnlyList<string> Animals => Visits
+        .Where(v => v.Label is not null)
+        .GroupBy(v => v.Label!, StringComparer.OrdinalIgnoreCase)
+        .OrderByDescending(g => g.Sum(v => v.Frames.Count))
+        .Select(g => g.First().Label!)
+        .ToList();
+
+    public string SuggestedFolderName => Names.FolderSuggestion(Name, Start, End, Animals);
+    public string FolderName => Names.Clean(Details.FolderName, 120) is { Length: > 0 } custom ? custom : SuggestedFolderName;
 }
 
 public sealed record ReviewOverview(IReadOnlyList<Place> Places, IReadOnlyList<SessionFile> Videos)
@@ -57,7 +72,43 @@ public sealed class ReviewService(ImportStore store, AppPaths paths)
             store.CreateSequences(sessionId, SequenceBuilder.Build(images));
         }
 
-        if (!store.HasSites(sessionId)) DetectPlaces(sessionId);
+        if (!store.HasSites(sessionId))
+        {
+            DetectPlaces(sessionId);
+            RecognisePlaces(sessionId);
+        }
+    }
+
+    /// <summary>
+    /// "Dette ser ut som Høgfjellåsen": a new place whose visits mostly match the remembered scenes
+    /// of a place saved before gets that name filled in. The user can always change it.
+    /// </summary>
+    private void RecognisePlaces(long sessionId)
+    {
+        var known = store.GetKnownScenes()
+            .Select(k => (k.KnownSiteId, k.Name, Scene: Scene.FromBytes(k.Edges, k.Night)))
+            .GroupBy(k => k.KnownSiteId)
+            .ToList();
+        if (known.Count == 0) return;
+
+        var scenes = store.GetVisitScenes(sessionId).ToDictionary(s => s.SequenceId, s => Scene.FromBytes(s.Edges, s.Night));
+        foreach (var place in GetOverview(sessionId).Places)
+        {
+            // A handful of visits is plenty, and keeps this quick with many remembered places.
+            var sample = SampleFrames(place.Visits.Where(v => scenes.ContainsKey(v.Id)).ToList(), 6)
+                .Select(v => scenes[v.Id]).ToList();
+            var best = known
+                .Select(site =>
+                {
+                    var checkable = sample.Where(s => site.Any(k => k.Scene.IsNight == s.IsNight)).ToList();
+                    var matching = checkable.Count(s => site
+                        .Where(k => k.Scene.IsNight == s.IsNight)
+                        .Any(k => k.Scene.Similarity(s) >= SiteDetector.SamePlace));
+                    return (Site: site.Key, Share: checkable.Count == 0 ? 0 : (double)matching / checkable.Count);
+                })
+                .MaxBy(x => x.Share);
+            if (best.Share > 0.5) store.SetRecognised(place.Id, best.Site);
+        }
     }
 
     /// <summary>
@@ -67,10 +118,13 @@ public sealed class ReviewService(ImportStore store, AppPaths paths)
     private void DetectPlaces(long sessionId)
     {
         var visits = LoadVisits(sessionId);
+        var scenes = visits.ToDictionary(v => v.Id, v => Scene.FromFrames(SampleFrames(v.Frames).Select(StagedPath)));
+        store.SaveVisitScenes(scenes.Where(s => s.Value is not null)
+            .Select(s => new StoredScene(s.Key, s.Value!.IsNight, s.Value.ToBytes())));
+
         var places = visits
             .GroupBy(v => v.Frames[0].Camera ?? "")
-            .SelectMany(camera => SiteDetector.Detect(camera.Select(v => new SiteInput(v.Id, v.Start, v.End,
-                Scene.FromFrames(SampleFrames(v.Frames).Select(StagedPath)))).ToList()))
+            .SelectMany(camera => SiteDetector.Detect(camera.Select(v => new SiteInput(v.Id, v.Start, v.End, scenes[v.Id])).ToList()))
             .OrderBy(ids => visits.First(v => v.Id == ids[0]).Start)
             .ToList();
         store.CreateSites(sessionId, places);
@@ -78,10 +132,12 @@ public sealed class ReviewService(ImportStore store, AppPaths paths)
 
     public ReviewOverview GetOverview(long sessionId)
     {
-        var names = store.GetSiteNames(sessionId);
+        var details = store.GetPlaceDetails(sessionId);
         var places = LoadVisits(sessionId)
             .GroupBy(v => v.SiteId ?? 0)
-            .Select(g => new Place(g.Key, names.GetValueOrDefault(g.Key, "Ukjent sted"), g.ToList()))
+            .Select(g => new Place(g.Key,
+                details.GetValueOrDefault(g.Key) ?? new PlaceDetails(g.Key, "Ukjent sted", null, null, null, null, []),
+                g.ToList()))
             .OrderBy(p => p.Start)
             .ToList();
         var videos = store.GetStagedFiles(sessionId).Where(f => f.Kind == MediaKind.Video).ToList();
@@ -118,6 +174,16 @@ public sealed class ReviewService(ImportStore store, AppPaths paths)
     }
 
     public void Merge(Visit first, Visit second) => store.MergeSequences(first.Id, second.Id);
+
+    public void SetLabel(Visit visit, string? label) => store.SetSequenceLabel(visit.Id, label);
+
+    public IReadOnlyList<string> AnimalSuggestions() =>
+        store.GetVocabulary("species").Concat(Species.Common).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+
+    public IReadOnlyList<string> TagSuggestions() => store.GetVocabulary("tag");
+
+    /// <summary>Everything needed before saving: every place has a name.</summary>
+    public bool IsReadyToSave(long sessionId) => GetOverview(sessionId).Places.All(p => p.IsNamed);
 
     /// <summary>"Nytt sted fra denne hendelsen": this visit and the later ones at its place become a new place.</summary>
     public void StartNewPlace(Place place, Visit from)
