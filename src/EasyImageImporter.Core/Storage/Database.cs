@@ -170,6 +170,22 @@ public sealed class Database
         INSERT INTO import_folders(import_id, folder_path, image_count, discarded_count)
             SELECT id, folder_path, image_count, discarded_count FROM imports;
         """,
+        // 6: animal recognition. What the models saw in each checked photo (so nothing is analysed
+        // twice and the analysis can stop and resume), and what the user did with a visit's suggestion.
+        """
+        CREATE TABLE frame_analyses(
+            file_id          INTEGER PRIMARY KEY REFERENCES session_files(id),
+            top_label        TEXT,             -- animal | human | vehicle, or null if nothing was found
+            top_conf         REAL NOT NULL,
+            box              TEXT,             -- "x y w h", 0–1
+            prediction       TEXT NOT NULL,    -- SpeciesNet label
+            prediction_score REAL NOT NULL,
+            name             TEXT NOT NULL,    -- Norwegian
+            model            TEXT NOT NULL,
+            analysed_utc     TEXT NOT NULL
+        );
+        ALTER TABLE sequences ADD COLUMN suggestion_state TEXT;   -- null | accepted | dismissed
+        """,
     ];
 
     private readonly string _connectionString;

@@ -5,6 +5,13 @@ namespace EasyImageImporter.Core.Review;
 
 public sealed record Visit(long Id, string? Label, long? SiteId, IReadOnlyList<SessionFile> Frames)
 {
+    /// <summary>What the animal recognition suggests, if it has looked at this visit yet.</summary>
+    public AnimalSuggestion? Suggestion { get; init; }
+    public SuggestionState SuggestionState { get; init; }
+
+    /// <summary>A suggestion the user hasn't said yes or no to yet (and that isn't already the label).</summary>
+    public bool HasOpenSuggestion => Suggestion is not null && SuggestionState == SuggestionState.Open && Label is null;
+
     public DateTime Start => Frames[0].TakenAt ?? default;
     public DateTime End => Frames[^1].TakenAt ?? default;
     public int KeptCount => Frames.Count(f => f.Keep);
@@ -147,13 +154,20 @@ public sealed class ReviewService(ImportStore store, AppPaths paths)
     private List<Visit> LoadVisits(long sessionId)
     {
         var info = store.GetSequenceInfo(sessionId);
+        var results = store.GetFrameResults(sessionId);
+        var states = store.GetSuggestionStates(sessionId);
         return store.GetStagedFiles(sessionId)
             .Where(f => f.Kind == MediaKind.Image && f.SequenceId is not null)
             .GroupBy(f => f.SequenceId!.Value)
             .Select(g =>
             {
                 var (label, site) = info.GetValueOrDefault(g.Key);
-                return new Visit(g.Key, label, site, Ordered(g));
+                var visit = new Visit(g.Key, label, site, Ordered(g));
+                return visit with
+                {
+                    Suggestion = results.Count == 0 ? null : AnimalAnalysis.Suggest(visit, results),
+                    SuggestionState = states.GetValueOrDefault(g.Key),
+                };
             })
             .OrderBy(v => v.Start).ThenBy(v => v.Id)
             .ToList();
@@ -176,6 +190,17 @@ public sealed class ReviewService(ImportStore store, AppPaths paths)
     public void Merge(Visit first, Visit second) => store.MergeSequences(first.Id, second.Id);
 
     public void SetLabel(Visit visit, string? label) => store.SetSequenceLabel(visit.Id, label);
+
+    /// <summary>"Ja": the suggestion becomes the visit's label.</summary>
+    public void AcceptSuggestion(Visit visit)
+    {
+        if (visit.Suggestion is not { Kind: SuggestionKind.Animal or SuggestionKind.Unsure } s) return;
+        store.SetSequenceLabel(visit.Id, s.Name);
+        store.SetSuggestionState(visit.Id, SuggestionState.Accepted);
+    }
+
+    /// <summary>"Nei": forget the suggestion for this visit.</summary>
+    public void DismissSuggestion(Visit visit) => store.SetSuggestionState(visit.Id, SuggestionState.Dismissed);
 
     public IReadOnlyList<string> AnimalSuggestions() =>
         store.GetVocabulary("species").Concat(Species.Common).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
