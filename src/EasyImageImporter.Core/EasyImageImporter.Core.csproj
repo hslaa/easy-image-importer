@@ -3,6 +3,7 @@
     <PackageReference Include="Microsoft.Data.Sqlite" />
     <PackageReference Include="MetadataExtractor" />
     <PackageReference Include="SkiaSharp" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="EasyImageImporter.Core.Tests" />

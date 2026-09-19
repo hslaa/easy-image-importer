@@ -26,6 +26,49 @@
                        IsVisible="{Binding VideosText, Converter={x:Static ObjectConverters.IsNotNull}}" />
             <TextBlock Classes="muted"
                        Text="Alt blir lagret, med mindre du sorterer det bort. Trykk på en hendelse for å se alle bildene i den." />
+
+            <!-- Animal recognition: offered once, then quietly at work in the background. -->
+            <Border Background="#E7EFE3" CornerRadius="10" Padding="16,12" Margin="0,6,0,0"
+                    IsVisible="{Binding Recognition.IsVisible}">
+                <StackPanel Spacing="8">
+                    <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding Recognition.IsOffered}">
+                        <StackPanel Spacing="2">
+                            <TextBlock FontWeight="SemiBold" Text="Finn dyr og tomme bilder automatisk" />
+                            <TextBlock FontSize="15" Classes="muted"
+                                       Text="Appen kan foreslå hvilke dyr som er på bildene, og finne bilder uten dyr. Du bestemmer alltid selv. Det krever en nedlasting, én gang." />
+                        </StackPanel>
+                        <Button Grid.Column="1" Classes="primary" Command="{Binding Recognition.DownloadCommand}"
+                                Content="{Binding Recognition.DownloadSize, StringFormat='Last ned ({0})'}"
+                                VerticalAlignment="Center" Margin="12,0,0,0" />
+                    </Grid>
+                    <StackPanel Spacing="6" IsVisible="{Binding Recognition.IsBusy}">
+                        <TextBlock FontSize="15" Text="{Binding Recognition.Text}" />
+                        <ProgressBar Value="{Binding Recognition.Progress}" Maximum="100" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="12" IsVisible="{Binding Recognition.IsFailed}">
+                        <TextBlock Classes="warning" FontSize="15" Text="{Binding Recognition.Text}" VerticalAlignment="Center" />
+                        <Button Content="Prøv igjen" Command="{Binding Recognition.DownloadCommand}" />
+                    </StackPanel>
+                    <TextBlock FontSize="15" Classes="muted" Text="{Binding Recognition.Text}"
+                               IsVisible="{Binding !Recognition.IsBusy}" />
+                </StackPanel>
+            </Border>
+
+            <!-- Alle · Ravn (5) · Kråkefugl (3) · Tomme (12) · Usikre (4) -->
+            <ItemsControl ItemsSource="{Binding Filters}" IsVisible="{Binding HasFilters}" Margin="0,4,0,0">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="review:FilterChip">
+                        <ToggleButton Content="{Binding Text}" IsChecked="{Binding IsSelected, Mode=OneWay}"
+                                      Command="{Binding SelectCommand}" FontSize="15" Padding="14,6"
+                                      CornerRadius="16" Margin="0,0,8,8" />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Classes="muted" FontSize="15" Text="{Binding FilterText}"
+                       IsVisible="{Binding FilterText, Converter={x:Static ObjectConverters.IsNotNull}}" />
         </StackPanel>
 
         <!-- Rows of three, virtualized: only the rows on screen are created. -->
@@ -67,6 +110,17 @@
                                             <StackPanel Spacing="2" Margin="14,10,14,12">
                                                 <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
                                                 <TextBlock Classes="muted" FontSize="15" Text="{Binding Details}" />
+                                                <TextBlock Classes="muted" FontSize="15" Text="Ser tom ut" FontStyle="Italic"
+                                                           IsVisible="{Binding LooksEmpty}" />
+                                                <!-- Suggest and confirm: nothing happens until the user says yes. -->
+                                                <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,4,0,0" IsVisible="{Binding HasQuestion}">
+                                                    <TextBlock Text="{Binding Question}" FontWeight="SemiBold" FontSize="15"
+                                                               VerticalAlignment="Center" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                                                    <Button Grid.Column="1" Content="Ja" Command="{Binding AcceptCommand}"
+                                                            FontSize="15" Padding="12,4" Margin="6,0,0,0" />
+                                                    <Button Grid.Column="2" Content="Nei" Command="{Binding DismissCommand}"
+                                                            FontSize="15" Padding="12,4" Margin="6,0,0,0" />
+                                                </Grid>
                                                 <Grid ColumnDefinitions="*,Auto" Margin="0,6,0,0">
                                                     <TextBlock FontSize="15" Text="{Binding KeepText}" VerticalAlignment="Center" />
                                                     <Button Grid.Column="1" Classes="link" FontSize="15"
