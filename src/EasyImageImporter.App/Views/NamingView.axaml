@@ -13,7 +13,7 @@
                 </StackPanel>
             </Button>
             <StackPanel Grid.Column="1" Spacing="2" Margin="20,0" VerticalAlignment="Center">
-                <TextBlock Classes="title" Text="Navn og tagger" />
+                <TextBlock Classes="title" Text="Navn og merking" />
                 <TextBlock Classes="muted" Text="Gi hvert sted et navn. Det blir brukt på mappen og i filnavnene." />
             </StackPanel>
             <StackPanel Grid.Column="2" Spacing="4" VerticalAlignment="Center">

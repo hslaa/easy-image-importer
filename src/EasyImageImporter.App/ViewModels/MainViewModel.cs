@@ -314,7 +314,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     private void Show(Screen screen) => Screen = screen;
 
-    /// <summary>Kopier · Gå gjennom · Navn og tagger · Tøm kortet, with the current one marked.</summary>
+    /// <summary>Kopier · Gå gjennom · Navn og merking · Tøm kortet, with the current one marked.</summary>
     public IReadOnlyList<FlowStep> Steps => FlowStep.For(Screen.Step);
     public bool HasSteps => Screen.Step > 0;
 

@@ -8,7 +8,7 @@ using EasyImageImporter.Core.Review;
 namespace EasyImageImporter.App.ViewModels.Review;
 
 /// <summary>
-/// "Navn og tagger": one card per place, just before saving. Every field is stored as it is typed,
+/// "Navn og merking": one card per place, just before saving. Every field is stored as it is typed,
 /// so nothing is lost if the app is closed here.
 /// </summary>
 public sealed partial class NamingScreen : Screen

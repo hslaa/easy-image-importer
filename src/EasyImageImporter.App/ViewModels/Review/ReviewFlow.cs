@@ -160,7 +160,7 @@ public sealed class ReviewFlow
         Refresh();
     }
 
-    /// <summary>"Navn og tagger": name each place before saving.</summary>
+    /// <summary>"Navn og merking": name each place before saving.</summary>
     public void ShowNaming()
     {
         var overview = review.GetOverview(sessionId);

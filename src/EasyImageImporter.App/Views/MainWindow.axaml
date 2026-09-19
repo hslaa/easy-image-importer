@@ -249,7 +249,7 @@
 
     <Panel>
         <DockPanel IsVisible="{Binding Overlay, Converter={x:Static ObjectConverters.IsNull}}">
-            <!-- Where you are: Kopier · Gå gjennom · Navn og tagger · Tøm kortet. -->
+            <!-- Where you are: Kopier · Gå gjennom · Navn og merking · Tøm kortet. -->
             <Border DockPanel.Dock="Top" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource LineBrush}"
                     BorderThickness="0,0,0,1" Padding="32,12" IsVisible="{Binding HasSteps}">
                 <ItemsControl ItemsSource="{Binding Steps}">

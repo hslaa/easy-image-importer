@@ -218,7 +218,7 @@ Deferred: v1 ships without any ML model. Grouping by time + frame (§4) carries 
 ## 7. UI
 
 - One window, one primary button per screen, large type (base ≥ 16 px), high contrast. Tray icon with "Åpne", "Mine importer", "Avslutt".
-- Screens: *Kort funnet* → *Kopierer* → *Gjennomgang* (sites → sequence cards → frame picker) → *Navn og tagger* → *Lagrer* → *Ferdig* → *Tøm kortet*, plus *Mine importer*.
+- Screens: *Kort funnet* → *Kopierer* → *Gjennomgang* (sites → sequence cards → frame picker) → *Navn og merking* → *Lagrer* → *Ferdig* → *Tøm kortet*, plus *Mine importer*.
 - Performance: the review level is sequences (dozens), not frames. The frame picker uses a virtualised grid with thumbnails from an on-disk cache, so a 1 000+ frame burst stays smooth.
 - Language: all strings in `.resx` (nb-NO), numbers formatted with `nb-NO` culture ("1 247").
 - Start with Windows: Velopack creates a Startup shortcut; single instance via named mutex. A second launch brings the existing window forward.

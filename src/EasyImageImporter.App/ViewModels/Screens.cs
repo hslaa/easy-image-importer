@@ -10,12 +10,12 @@ public abstract class Screen : ObservableObject
     public virtual int Step => 0;
 }
 
-/// <summary>The four steps shown at the top: Kopier · Gå gjennom · Navn og tagger · Tøm kortet.</summary>
+/// <summary>The four steps shown at the top: Kopier · Gå gjennom · Navn og merking · Tøm kortet.</summary>
 public sealed record FlowStep(int Number, string Label, bool IsDone, bool IsCurrent)
 {
     public const int Copy = 1, Review = 2, Naming = 3, Erase = 4, AllDone = 5;
 
-    private static readonly string[] Labels = ["Kopier", "Gå gjennom", "Navn og tagger", "Tøm kortet"];
+    private static readonly string[] Labels = ["Kopier", "Gå gjennom", "Navn og merking", "Tøm kortet"];
 
     public bool IsTodo => !IsDone && !IsCurrent;
     public bool IsLast => Number == Labels.Length;
