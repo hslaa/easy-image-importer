@@ -68,7 +68,13 @@ public readonly record struct DownloadProgress(long Bytes, long Total);
 public sealed class ModelStore(string modelsDir, HttpClient? http = null)
 {
     public const string DetectorFile = "detector.onnx", ClassifierFile = "classifier.onnx", TaxonomyFile = "norway.json";
-    public const string ReleaseUrl = "https://github.com/hslaa/easy-image-importer/releases/download/models-1/";
+    public const string DefaultReleaseUrl = "https://github.com/hslaa/easy-image-importer/releases/download/models-1/";
+
+    /// <summary>Where the files come from. EASYIMAGEIMPORTER_MODELS_URL overrides it (testing with a local server).</summary>
+    public static string ReleaseUrl =>
+        Environment.GetEnvironmentVariable("EASYIMAGEIMPORTER_MODELS_URL") is { Length: > 0 } url
+            ? url.TrimEnd('/') + "/"
+            : DefaultReleaseUrl;
 
     /// <summary>Pinned: a new model version means a new release tag and new hashes here.</summary>
     public static readonly IReadOnlyList<(string Name, long Bytes, string Sha256)> Files =
