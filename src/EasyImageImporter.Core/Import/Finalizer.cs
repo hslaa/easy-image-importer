@@ -1,28 +1,40 @@
 using System.Globalization;
 using System.Text;
 using EasyImageImporter.Core.IO;
+using EasyImageImporter.Core.Metadata;
+using EasyImageImporter.Core.Naming;
+using EasyImageImporter.Core.Review;
 
 namespace EasyImageImporter.Core.Import;
 
+public readonly record struct SaveProgress(int Done, int Total);
+
 /// <summary>
-/// Moves verified files from staging into the archive folder.
-/// M1: a flat folder, <c>Viltkamera\yyyy\yyyy-MM-dd Import\</c>, with the camera's own file names.
-/// The whole move plan is written to the database before the first file moves, so a crash
-/// halfway through is finished by simply running <see cref="Run"/> again.
+/// Saves an import: one folder per place, <c>Viltkamera\2026\Høgfjellåsen Juni 2026 – Kongeørn\</c>,
+/// files named <c>2026-06-03_Høgfjellåsen_0712_Kongeørn_001.jpg</c>, sorted-away photos in
+/// <c>Sortert bort\</c>, a plain-text summary per folder, and tags Windows Explorer can search.
+///
+/// The whole move plan is written to the database before the first file moves, so a crash halfway
+/// is finished by simply running <see cref="Run"/> again; every later step is safe to repeat.
 /// </summary>
-public sealed class Finalizer(IFileSystem fs, ImportStore store, AppPaths paths, TimeProvider? time = null)
+public sealed class Finalizer(
+    IFileSystem fs, ImportStore store, AppPaths paths, TimeProvider? time = null, Func<ExifTool?>? exifTool = null)
 {
     public const string SummaryFileName = "OM DENNE MAPPEN.txt";
 
     /// <summary>Where discarded images go: inside the import, so they can always be found again.</summary>
     public const string DiscardedFolderName = "Sortert bort";
 
+    /// <summary>Scenes remembered per place per import, for recognising it next season.</summary>
+    private const int ScenesToRemember = 12;
+
     private static readonly CultureInfo Norwegian = CultureInfo.GetCultureInfo("nb-NO");
     private readonly TimeProvider _time = time ?? TimeProvider.System;
     private readonly SafeMover _mover = new(fs);
+    private readonly ReviewService _review = new(store, paths);
 
     /// <summary>Returns the import, or null when every file was already archived before (nothing new to store).</summary>
-    public ImportRecord? Run(long sessionId)
+    public ImportRecord? Run(long sessionId, IProgress<SaveProgress>? progress = null)
     {
         var session = store.GetSession(sessionId);
         var import = session.State switch
@@ -39,15 +51,22 @@ public sealed class Finalizer(IFileSystem fs, ImportStore store, AppPaths paths,
             return null;
         }
 
-        fs.CreateDirectory(import.FolderPath);
-        foreach (var move in store.GetMoves(import.Id).Where(m => !m.Done))
+        var moves = store.GetMoves(import.Id);
+        var total = moves.Count * (exifTool is null ? 1 : 2);
+        var done = moves.Count(m => m.Done);
+        foreach (var move in moves.Where(m => !m.Done))
         {
             _mover.Move(move.FromPath, move.ToPath);
             store.MarkMoveDone(move.ImportId, move.FileId);
+            progress?.Report(new SaveProgress(++done, total));
         }
 
-        WriteSummary(import, session);
+        var overview = _review.GetOverview(sessionId);
+        WriteMetadata(moves, overview, progress, done, total);
+        foreach (var folder in store.GetImportFolders(import.Id)) WriteSummary(import, folder, overview);
+
         store.CompleteImport(import.Id, sessionId);
+        RememberPlaces(sessionId, overview);
         MarkErasedIfCardIsEmpty(sessionId);
         return store.GetImportForSession(sessionId);
     }
@@ -64,39 +83,121 @@ public sealed class Finalizer(IFileSystem fs, ImportStore store, AppPaths paths,
         var files = store.GetStagedFiles(session.Id);
         if (files.Count == 0) return null;
 
-        var today = _time.GetLocalNow();
-        var yearDir = Path.Combine(paths.ArchiveRoot, today.ToString("yyyy", CultureInfo.InvariantCulture));
-        var folder = UniquePath(Path.Combine(yearDir, $"{today:yyyy-MM-dd} Import"), fs.DirectoryExists);
+        _review.Prepare(session.Id); // normally done by the review already; cheap if so
+        var overview = _review.GetOverview(session.Id);
+        var placeOf = new Dictionary<long, (Place Place, Visit Visit)>();
+        foreach (var place in overview.Places)
+        foreach (var visit in place.Visits)
+        foreach (var frame in visit.Frames)
+            placeOf[frame.Id] = (place, visit);
 
-        var discardedFolder = Path.Combine(folder, DiscardedFolderName);
-        var takenKept = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var takenDiscarded = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var moves = files.Select(f =>
+        var moves = new List<(long FileId, string From, string To)>();
+        var folders = new List<ImportFolder>();
+        var plannedFolders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var takenNames = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+
+        string FolderFor(string name, DateTime start)
         {
-            var from = Path.Combine(paths.StagingDir(session.Id), f.StagingName!);
-            var to = f.Keep
-                ? Path.Combine(folder, UniqueName(f.FileName, takenKept))
-                : Path.Combine(discardedFolder, UniqueName(f.FileName, takenDiscarded));
-            return (f.Id, from, to);
-        }).ToList();
+            var year = (start.Year >= 2010 ? start.Year : _time.GetLocalNow().Year).ToString(CultureInfo.InvariantCulture);
+            var path = UniquePath(Path.Combine(paths.ArchiveRoot, year, name),
+                p => fs.DirectoryExists(p) || plannedFolders.Contains(p));
+            plannedFolders.Add(path);
+            return path;
+        }
 
-        return store.CreateImportPlan(session.Id, folder, moves, discardedCount: files.Count(f => !f.Keep));
+        void Add(SessionFile file, string folder, string name)
+        {
+            var dir = file.Keep ? folder : Path.Combine(folder, DiscardedFolderName);
+            if (!takenNames.TryGetValue(dir, out var taken)) takenNames[dir] = taken = [];
+            moves.Add((file.Id, Path.Combine(paths.StagingDir(session.Id), file.StagingName!),
+                Path.Combine(dir, UniqueName(name, taken))));
+        }
+
+        foreach (var place in overview.Places)
+        {
+            var folder = FolderFor(place.FolderName, place.Start);
+            foreach (var visit in place.Visits)
+                for (var i = 0; i < visit.Frames.Count; i++)
+                    Add(visit.Frames[i], folder,
+                        Names.FileName(visit.Start, place.Name, visit.Label, i + 1, Path.GetExtension(visit.Frames[i].RelPath)));
+            folders.Add(new ImportFolder(0, folder,
+                place.Visits.Sum(v => v.KeptCount), place.ImageCount - place.Visits.Sum(v => v.KeptCount), place.Id));
+        }
+
+        // Videos (and anything not in a visit) go with the place they were filmed nearest in time to.
+        var rest = files.Where(f => !placeOf.ContainsKey(f.Id)).ToList();
+        if (rest.Count > 0)
+        {
+            string? fallback = null;
+            foreach (var file in rest.OrderBy(f => f.TakenAt).ThenBy(f => f.RelPath, StringComparer.Ordinal))
+            {
+                var taken = file.TakenAt ?? file.MtimeUtc.ToLocalTime();
+                var place = overview.Places.MinBy(p => taken < p.Start ? p.Start - taken : taken > p.End ? taken - p.End : TimeSpan.Zero);
+                string folder, placeName;
+                if (place is null)
+                {
+                    fallback ??= FolderFor($"{_time.GetLocalNow():yyyy-MM-dd} Import", _time.GetLocalNow().DateTime);
+                    (folder, placeName) = (fallback, "Import");
+                }
+                else
+                {
+                    folder = folders.First(f => f.PlaceId == place.Id).FolderPath;
+                    placeName = place.Name;
+                }
+                Add(file, folder, Names.FileName(taken, placeName, null, 1, Path.GetExtension(file.RelPath)));
+
+                var index = folders.FindIndex(f => f.FolderPath == folder);
+                if (index >= 0) folders[index] = folders[index] with { ImageCount = folders[index].ImageCount + 1 };
+                else folders.Add(new ImportFolder(0, folder, 1, 0));
+            }
+        }
+
+        var import = store.CreateImportPlan(session.Id, folders[0].FolderPath, moves,
+            discardedCount: files.Count(f => !f.Keep));
+        store.AddImportFolders(import.Id, folders.Select(f => f with { ImportId = import.Id }));
+        return import;
     }
 
-    private void WriteSummary(ImportRecord import, Session session)
+    /// <summary>
+    /// Title, description and tags, so Explorer's own search and Properties panel find them.
+    /// Optional: without ExifTool, or for a photo it can't safely tag, the photo is simply left as it was.
+    /// </summary>
+    private void WriteMetadata(IReadOnlyList<ImportMove> moves, ReviewOverview overview, IProgress<SaveProgress>? progress,
+        int done, int total)
     {
-        var files = store.GetStagedFiles(session.Id);
-        var first = files.Min(f => f.TakenAt ?? f.MtimeUtc.ToLocalTime());
-        var last = files.Max(f => f.TakenAt ?? f.MtimeUtc.ToLocalTime());
-        var text = new StringBuilder()
-            .AppendLine("Bilder fra viltkamera")
-            .AppendLine()
-            .AppendLine(string.Create(Norwegian, $"Importert:   {import.CreatedUtc.ToLocalTime():d. MMMM yyyy 'kl.' HH:mm}"))
-            .AppendLine(string.Create(Norwegian, $"Antall:      {import.ImageCount:N0} bilder"))
-            .AppendLine(string.Create(Norwegian, $"Tatt:        {first:d. MMMM yyyy} – {last:d. MMMM yyyy}"));
-        if (import.DiscardedCount > 0)
+        if (exifTool is null) return;
+        using var tool = exifTool();
+        if (tool is null) return;
+
+        var byFile = overview.Places
+            .SelectMany(p => p.Visits.SelectMany(v => v.Frames.Select(f => (f.Id, Place: p, Visit: v))))
+            .ToDictionary(x => x.Id);
+        foreach (var move in moves)
+        {
+            progress?.Report(new SaveProgress(++done, total));
+            if (!byFile.TryGetValue(move.FileId, out var at)) continue; // videos
+            if (Path.GetExtension(move.ToPath).ToLowerInvariant() is not (".jpg" or ".jpeg")) continue;
+            var keywords = new List<string> { at.Place.Name };
+            if (at.Visit.Label is { } label) keywords.Add(label);
+            keywords.AddRange(at.Place.Details.Tags);
+            tool.Write(move.ToPath, new PhotoMetadata(at.Place.Name, at.Place.Details.Description, keywords));
+        }
+    }
+
+    private void WriteSummary(ImportRecord import, ImportFolder folder, ReviewOverview overview)
+    {
+        var place = overview.Places.FirstOrDefault(p => p.Id == folder.PlaceId);
+        var text = new StringBuilder().AppendLine(place is null ? "Bilder fra viltkamera" : place.Name).AppendLine();
+        if (place?.Details.Description is { } description) text.AppendLine(description).AppendLine();
+        if (place is not null)
+            text.AppendLine(string.Create(Norwegian, $"Tatt:         {place.Start:d. MMMM yyyy} – {place.End:d. MMMM yyyy}"));
+        text.AppendLine(string.Create(Norwegian, $"Antall:       {folder.ImageCount:N0} bilder"));
+        if (folder.DiscardedCount > 0)
             text.AppendLine(string.Create(Norwegian,
-                $"Sortert bort: {import.DiscardedCount:N0} bilder, i mappen «{DiscardedFolderName}». De er ikke slettet."));
+                $"Sortert bort: {folder.DiscardedCount:N0} bilder, i mappen «{DiscardedFolderName}». De er ikke slettet."));
+        if (place is not null && place.Animals.Count > 0) text.AppendLine($"Dyr:          {string.Join(", ", place.Animals)}");
+        if (place is not null && place.Details.Tags.Count > 0) text.AppendLine($"Stikkord:     {string.Join(", ", place.Details.Tags)}");
+        text.AppendLine(string.Create(Norwegian, $"Importert:    {import.CreatedUtc.ToLocalTime():d. MMMM yyyy 'kl.' HH:mm}"));
         var contents = text
             .AppendLine()
             .AppendLine("Denne filen er laget av EasyImageImporter, og kan leses uten programmet.")
@@ -104,7 +205,21 @@ public sealed class Finalizer(IFileSystem fs, ImportStore store, AppPaths paths,
             .ReplaceLineEndings("\r\n");
 
         // UTF-8 with BOM so old Notepad shows æøå correctly.
-        fs.WriteAllText(Path.Combine(import.FolderPath, SummaryFileName), contents, new UTF8Encoding(true));
+        fs.CreateDirectory(folder.FolderPath);
+        fs.WriteAllText(Path.Combine(folder.FolderPath, SummaryFileName), contents, new UTF8Encoding(true));
+    }
+
+    /// <summary>Named places teach the app what they look like, so the next card from there is recognised.</summary>
+    private void RememberPlaces(long sessionId, ReviewOverview overview)
+    {
+        var scenes = store.GetVisitScenes(sessionId).ToDictionary(s => s.SequenceId);
+        foreach (var place in overview.Places.Where(p => p.IsNamed))
+        {
+            var ofPlace = place.Visits.Where(v => scenes.ContainsKey(v.Id)).Select(v => scenes[v.Id]).ToList();
+            var sample = ReviewService.SampleFrames(ofPlace.Where(s => !s.Night).ToList(), ScenesToRemember / 2)
+                .Concat(ReviewService.SampleFrames(ofPlace.Where(s => s.Night).ToList(), ScenesToRemember / 2));
+            store.RememberPlace(place.Name, sample);
+        }
     }
 
     internal static string UniquePath(string path, Func<string, bool> exists)
@@ -117,7 +232,7 @@ public sealed class Finalizer(IFileSystem fs, ImportStore store, AppPaths paths,
         }
     }
 
-    /// <summary>Cameras restart their counters, so two folders on one card can both hold IMAG0001.JPG.</summary>
+    /// <summary>Two files may end up with the same name (e.g. two cameras); the second gets " (2)".</summary>
     internal static string UniqueName(string fileName, ISet<string> taken)
     {
         var name = fileName;

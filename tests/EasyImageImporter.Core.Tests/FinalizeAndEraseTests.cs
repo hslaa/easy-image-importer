@@ -16,9 +16,10 @@ public sealed class FinalizeAndEraseTests : IDisposable
         var (session, import) = _env.ImportCard();
 
         Assert.Equal(SessionState.Imported, session.State);
-        var expected = Path.Combine(_env.Paths.ArchiveRoot, "2026", "2026-09-19 Import");
+        // Not named yet (the app requires a name; Core falls back to "Sted 1").
+        var expected = Path.Combine(_env.Paths.ArchiveRoot, "2026", "Sted 1 September 2026");
         Assert.Equal(expected, import!.FolderPath);
-        Assert.True(File.Exists(Path.Combine(expected, "IMAG0001.JPG")));
+        Assert.Equal(3, Directory.GetFiles(expected, "*.jpg").Length);
         var summary = File.ReadAllBytes(Path.Combine(expected, Finalizer.SummaryFileName));
         Assert.Equal(new byte[] { 0xEF, 0xBB, 0xBF }, summary[..3]);
         Assert.Contains("3 bilder", Encoding.UTF8.GetString(summary));
@@ -31,10 +32,10 @@ public sealed class FinalizeAndEraseTests : IDisposable
         var a = _env.AddCardFile("DCIM/100MEDIA/IMAG0001.JPG");
         var b = _env.AddCardFile("DCIM/101MEDIA/IMAG0001.JPG");
 
-        var (_, import) = _env.ImportCard();
+        _env.ImportCard();
 
-        Assert.Equal(a, File.ReadAllBytes(Path.Combine(import!.FolderPath, "IMAG0001.JPG")));
-        Assert.Equal(b, File.ReadAllBytes(Path.Combine(import.FolderPath, "IMAG0001 (2).JPG")));
+        var saved = _env.ArchivedImages().Select(File.ReadAllBytes).Select(Convert.ToBase64String).ToHashSet();
+        Assert.Equal([Convert.ToBase64String(a), Convert.ToBase64String(b)], saved.Order());
     }
 
     [Fact]
@@ -47,7 +48,7 @@ public sealed class FinalizeAndEraseTests : IDisposable
 
         var (_, secondImport) = _env.ImportCard();
 
-        Assert.EndsWith("2026-09-19 Import (2)", secondImport!.FolderPath);
+        Assert.EndsWith("Sted 1 September 2026 (2)", secondImport!.FolderPath);
         Assert.NotEqual(firstImport!.FolderPath, secondImport.FolderPath);
     }
 
@@ -142,7 +143,7 @@ public sealed class FinalizeAndEraseTests : IDisposable
     {
         _env.AddCardImages(2);
         var (session, import) = _env.ImportCard();
-        File.Delete(Path.Combine(import!.FolderPath, "IMAG0001.JPG"));
+        File.Delete(Directory.GetFiles(import!.FolderPath, "*.jpg").Order().First());
 
         var outcome = _env.Eraser.Erase(session.Id);
 
@@ -219,7 +220,7 @@ public sealed class FinalizeAndEraseTests : IDisposable
         _env.Recovery.Run();
         _env.Eraser.Erase(session.Id);
 
-        var archived = _env.ArchivedFiles().Where(p => p.EndsWith(".JPG"))
+        var archived = _env.ArchivedImages()
             .Select(File.ReadAllBytes).Select(Convert.ToBase64String).ToHashSet();
         Assert.Equal(originals, archived);
         Assert.Equal(SessionState.CardErased, _env.Store.GetSession(session.Id).State);

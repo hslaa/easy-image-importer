@@ -76,6 +76,7 @@ public sealed partial class ImportStore
         Execute(c, tx, "UPDATE session_files SET sequence_id = $k WHERE sequence_id = $r;", ("$k", keptId), ("$r", removedId));
         Execute(c, tx, "UPDATE sequences SET label = COALESCE(label, (SELECT label FROM sequences WHERE id = $r)) WHERE id = $k;",
             ("$k", keptId), ("$r", removedId));
+        Execute(c, tx, "DELETE FROM visit_scenes WHERE sequence_id = $r;", ("$r", removedId));
         Execute(c, tx, "DELETE FROM sequences WHERE id = $r;", ("$r", removedId));
         tx.Commit();
     }

@@ -10,7 +10,7 @@
                 <TextBlock Classes="title" Text="Gå gjennom bildene" />
                 <TextBlock Text="{Binding Summary}" />
             </StackPanel>
-            <Button Grid.Column="1" Classes="primary" Content="Lagre bildene" Command="{Binding SaveCommand}"
+            <Button Grid.Column="1" Classes="primary" Content="Neste: navn og tagger →" Command="{Binding NextCommand}"
                     VerticalAlignment="Top" />
         </Grid>
 

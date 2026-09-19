@@ -52,6 +52,23 @@ jobs:
           -p:PublishReadyToRun=true -p:Version=${{ env.VERSION }}
           -p:UpdateRepoUrl=${{ env.UPDATE_REPO_URL }} -o publish
 
+      # ExifTool writes the names and tags into the photos so Explorer can search them.
+      # Pinned version, checked against the SHA-256 published on exiftool.org.
+      - name: Bundle ExifTool
+        shell: pwsh
+        run: |
+          $version = "13.59"
+          $sha256 = "44b512b25af500724ba579d0a53c8fc5851628b692dd5e5d94ae4a15c2cba9ec"
+          Invoke-WebRequest "https://sourceforge.net/projects/exiftool/files/exiftool-${version}_64.zip/download" `
+            -OutFile exiftool.zip -UserAgent "curl"
+          if ((Get-FileHash exiftool.zip -Algorithm SHA256).Hash -ne $sha256) { throw "ExifTool checksum mismatch" }
+          Expand-Archive exiftool.zip -DestinationPath exiftool-unzipped
+          $dir = "exiftool-unzipped/exiftool-${version}_64"
+          New-Item -ItemType Directory publish/exiftool -Force | Out-Null
+          Copy-Item "$dir/exiftool_files" publish/exiftool/ -Recurse
+          Copy-Item "$dir/exiftool(-k).exe" publish/exiftool/exiftool.exe
+          & publish/exiftool/exiftool.exe -ver
+
       - run: dotnet tool install -g vpk --version 1.2.0
 
       - name: Fetch previous release (enables small delta updates)

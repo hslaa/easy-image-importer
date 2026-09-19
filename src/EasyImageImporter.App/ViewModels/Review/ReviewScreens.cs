@@ -48,7 +48,7 @@ internal static class Rows
 /// <summary>All visits on the card. "Default is keep everything": the user actively sorts away.</summary>
 public sealed partial class ReviewScreen(
     ReviewOverview overview, IReadOnlyList<object> rows, string? alreadyImportedText, string? failedText,
-    Func<Task> save, Func<Task> retryFailed) : Screen
+    Action next, Func<Task> retryFailed) : Screen
 {
     /// <summary>A <see cref="PlaceHeader"/> followed by that place's <see cref="VisitRow"/>s, place by place.</summary>
     public IReadOnlyList<object> Rows { get; } = rows;
@@ -71,8 +71,9 @@ public sealed partial class ReviewScreen(
     public string? AlreadyImportedText { get; } = alreadyImportedText;
     public string? FailedText { get; } = failedText;
 
+    /// <summary>On to naming the places; saving happens from there.</summary>
     [RelayCommand]
-    private Task Save() => save();
+    private void Next() => next();
 
     [RelayCommand]
     private Task Retry() => retryFailed();
@@ -82,7 +83,9 @@ public sealed partial class VisitCard(Visit visit, int number, LazyThumbnail cov
     : ObservableObject
 {
     public LazyThumbnail Cover { get; } = cover;
-    public string Title { get; } = $"{number}. {Rows.TimeSpanText(visit.Start, visit.End)}";
+    public string Title { get; } = visit.Label is { } label
+        ? $"{number}. {label} · {Rows.TimeSpanText(visit.Start, visit.End)}"
+        : $"{number}. {Rows.TimeSpanText(visit.Start, visit.End)}";
     public string Details { get; } = $"{Rows.DateText(visit.Start)} · {Rows.Count(visit.Frames.Count)}";
 
     public string KeepText { get; } =
@@ -115,6 +118,8 @@ public sealed partial class VisitScreen : Screen
         _visit = visit;
         _review = review;
         _split = split;
+        _label = visit.Label ?? "";
+        AnimalSuggestions = review.AnimalSuggestions();
         Tiles = tiles;
         Rows = Review.Rows.Of(tiles, 4, items => new FrameRow(items));
         Title = $"Hendelse {number} av {total}";
@@ -134,6 +139,13 @@ public sealed partial class VisitScreen : Screen
     public string Details { get; }
 
     [ObservableProperty] private string _keptText = "";
+
+    /// <summary>What's in the pictures ("Kongeørn"). Optional; used in file names, tags and the folder name.</summary>
+    [ObservableProperty] private string _label;
+
+    public IReadOnlyList<string> AnimalSuggestions { get; }
+
+    partial void OnLabelChanged(string value) => _review.SetLabel(_visit, value);
     [ObservableProperty] private FrameViewer? _viewer;
 
     public IRelayCommand BackCommand { get; }

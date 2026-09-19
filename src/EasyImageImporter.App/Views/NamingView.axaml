@@ -1,0 +1,101 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:review="using:EasyImageImporter.App.ViewModels.Review"
+             x:Class="EasyImageImporter.App.Views.NamingView"
+             x:DataType="review:NamingScreen">
+
+    <DockPanel Margin="32,28">
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto">
+            <Button Content="← Bildene" Command="{Binding BackCommand}" VerticalAlignment="Top" />
+            <StackPanel Grid.Column="1" Spacing="4" Margin="20,0">
+                <TextBlock Classes="title" Text="Navn og tagger" />
+                <TextBlock Classes="muted" Text="Gi hvert sted et navn. Navnet brukes på mappen og i filnavnene, og du kan søke etter det i Utforsker." />
+            </StackPanel>
+            <StackPanel Grid.Column="2" Spacing="6" VerticalAlignment="Top">
+                <Button Classes="primary" Content="Lagre bildene" Command="{Binding SaveCommand}" HorizontalAlignment="Right" />
+                <TextBlock Classes="warning" FontSize="15" Text="{Binding MissingText}" HorizontalAlignment="Right"
+                           IsVisible="{Binding MissingText, Converter={x:Static ObjectConverters.IsNotNull}}" />
+            </StackPanel>
+        </Grid>
+
+        <ScrollViewer Margin="0,20,0,0">
+            <ItemsControl ItemsSource="{Binding Places}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="review:PlaceForm">
+                        <Border Background="White" CornerRadius="12" Padding="24,20" Margin="0,0,14,16">
+                            <Grid ColumnDefinitions="260,*" ColumnSpacing="24">
+                                <!-- A few photos, so it's obvious which place this is. -->
+                                <StackPanel Spacing="8">
+                                    <TextBlock Text="{Binding Heading}" FontSize="22" FontWeight="SemiBold" />
+                                    <TextBlock Classes="muted" FontSize="15" Text="{Binding Details}" />
+                                    <ItemsControl ItemsSource="{Binding Covers}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate><UniformGrid Columns="2" /></ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate DataType="review:LazyThumbnail">
+                                                <Border CornerRadius="6" ClipToBounds="True" Margin="0,0,6,6" Background="#DDD8CC" Height="80">
+                                                    <Image Source="{Binding Image}" Stretch="UniformToFill" />
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="1" Spacing="6">
+                                    <TextBlock Text="Navn på stedet" FontWeight="SemiBold" />
+                                    <TextBox Text="{Binding Title}" PlaceholderText="F.eks. Høgfjellåsen" FontSize="18" />
+                                    <TextBlock Classes="muted" FontSize="15" Text="{Binding RecognisedText}"
+                                               IsVisible="{Binding RecognisedText, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+                                    <TextBlock Text="Beskrivelse" FontWeight="SemiBold" Margin="0,10,0,0" />
+                                    <TextBox Text="{Binding Description}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="70"
+                                             PlaceholderText="Valgfritt, f.eks. «Revekadaver ved stien opp fra myra»" FontSize="16" />
+
+                                    <TextBlock Text="Stikkord" FontWeight="SemiBold" Margin="0,10,0,0" />
+                                    <ItemsControl ItemsSource="{Binding Tags}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate DataType="review:TagChip">
+                                                <Border Background="#E7EFE3" CornerRadius="14" Padding="12,2,4,2" Margin="0,0,6,6">
+                                                    <StackPanel Orientation="Horizontal" Spacing="2">
+                                                        <TextBlock Text="{Binding Text}" FontSize="15" VerticalAlignment="Center" />
+                                                        <Button Classes="link" Content="×" FontSize="15" Padding="6,0"
+                                                                Command="{Binding RemoveCommand}" ToolTip.Tip="Fjern" />
+                                                    </StackPanel>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <AutoCompleteBox Text="{Binding NewTag}" ItemsSource="{Binding TagSuggestions}" Width="260"
+                                                         FilterMode="StartsWith" MinimumPrefixLength="1" FontSize="16"
+                                                         PlaceholderText="F.eks. åte, vinter">
+                                            <AutoCompleteBox.KeyBindings>
+                                                <KeyBinding Gesture="Enter" Command="{Binding AddTagCommand}" />
+                                            </AutoCompleteBox.KeyBindings>
+                                        </AutoCompleteBox>
+                                        <Button Content="Legg til" Command="{Binding AddTagCommand}" />
+                                    </StackPanel>
+
+                                    <TextBlock Text="Dyr (fra hendelsene)" FontWeight="SemiBold" Margin="0,10,0,0" />
+                                    <TextBlock Text="{Binding AnimalsText}" />
+
+                                    <TextBlock Text="Mappenavn" FontWeight="SemiBold" Margin="0,10,0,0" />
+                                    <TextBox Text="{Binding FolderName}" FontSize="16" />
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBlock Classes="muted" FontSize="14" Text="{Binding FolderPreview}" VerticalAlignment="Center" />
+                                        <Button Classes="link" FontSize="14" Content="Bruk forslaget"
+                                                Command="{Binding UseSuggestedFolderCommand}" IsVisible="{Binding IsCustomFolder}" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </DockPanel>
+</UserControl>

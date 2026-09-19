@@ -21,6 +21,21 @@ public sealed class Scene
         IsNight = night;
     }
 
+    /// <summary>A scene saved earlier (see <see cref="ToBytes"/>).</summary>
+    public static Scene FromBytes(byte[] edges, bool night)
+    {
+        var values = new float[Width * Height];
+        Buffer.BlockCopy(edges, 0, values, 0, Math.Min(edges.Length, values.Length * sizeof(float)));
+        return new Scene(values, night);
+    }
+
+    public byte[] ToBytes()
+    {
+        var bytes = new byte[Edges.Length * sizeof(float)];
+        Buffer.BlockCopy(Edges, 0, bytes, 0, bytes.Length);
+        return bytes;
+    }
+
     /// <summary>Edge strength per pixel, normalized to mean 0 and length 1 for correlation.</summary>
     public float[] Edges { get; }
 

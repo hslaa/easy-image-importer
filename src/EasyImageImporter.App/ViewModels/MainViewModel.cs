@@ -6,6 +6,7 @@ using Serilog;
 using EasyImageImporter.Core.Cards;
 using EasyImageImporter.Core.Import;
 using EasyImageImporter.Core.IO;
+using EasyImageImporter.Core.Metadata;
 using EasyImageImporter.Core.Storage;
 
 namespace EasyImageImporter.App.ViewModels;
@@ -48,7 +49,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _store = new ImportStore(new Database(paths.DatabasePath));
         _scanner = new CardScanner(fs, _store);
         _copier = new CopyEngine(fs, _store, paths);
-        _finalizer = new Finalizer(fs, _store, paths);
+        _finalizer = new Finalizer(fs, _store, paths,
+            exifTool: () => ExifTool.Locate() is { } exe ? new ExifTool(exe) : null);
         _eraser = new CardEraser(fs, _store);
         _undo = new ImportUndo(fs, _store, paths);
         _review = new ReviewService(_store, paths);
@@ -198,10 +200,25 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     private async Task SaveAsync(Session session)
     {
-        Show(Working("Lagrer bildene…"));
-        var import = await Task.Run(() => _finalizer.Run(session.Id));
+        var screen = Working("Lagrer bildene…");
+        screen.IsIndeterminate = false;
+        Show(screen);
+        var progress = new Progress<SaveProgress>(p =>
+        {
+            screen.Progress = 100.0 * p.Done / Math.Max(1, p.Total);
+            screen.Detail = p.Done * 2 <= p.Total || p.Total == 0 ? "Flytter bildene på plass…" : "Skriver navn og stikkord i bildene…";
+        });
+        var import = await Task.Run(() => _finalizer.Run(session.Id, progress));
         Log.Information("Session {Session} saved to {Folder}", session.Id, import?.FolderPath ?? "(nothing new)");
         await ShowDoneAsync(session);
+    }
+
+    private IReadOnlyList<FolderLink> FoldersOf(ImportRecord import)
+    {
+        var folders = _store.GetImportFolders(import.Id);
+        return folders.Count > 0
+            ? folders.Select(f => new FolderLink(f.FolderPath, f.ImageCount, f.DiscardedCount)).ToList()
+            : [new FolderLink(import.FolderPath, import.ImageCount, import.DiscardedCount)];
     }
 
     private Task ShowDoneAsync(Session session)
@@ -209,8 +226,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         var import = _store.GetImportForSession(session.Id);
         var decision = _eraser.Evaluate(session.Id);
         var canUndo = import is not null && _undo.Evaluate(import.Id).Allowed;
-        Show(new DoneScreen(import?.FolderPath, import?.ImageCount ?? 0, import?.DiscardedCount ?? 0, decision.Count,
-            decision.Reason, canUndo,
+        Show(new DoneScreen(import is null ? [] : FoldersOf(import), import?.ImageCount ?? 0, import?.DiscardedCount ?? 0,
+            decision.Count, decision.Reason, canUndo,
             erase: () => RunGuardedAsync(() => EraseAsync(session)),
             undo: () => RunGuardedAsync(() => UndoAsync(import!.Id))));
         return Task.CompletedTask;
@@ -254,8 +271,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public void ShowImports()
     {
         var rows = _store.GetImports().Select(import => new ImportRow(
-            import.FolderPath, import.CreatedUtc, import.ImageCount, import.DiscardedCount,
-            folderExists: Directory.Exists(import.FolderPath),
+            FoldersOf(import), import.CreatedUtc,
             canUndo: !_busy && _undo.Evaluate(import.Id).Allowed,
             undo: () => _busy ? Task.CompletedTask : RunGuardedAsync(() => UndoAsync(import.Id)))).ToList();
         Overlay = new ImportsScreen(rows, close: () => Overlay = null);

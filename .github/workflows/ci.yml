@@ -20,5 +20,10 @@ jobs:
           dotnet-version: |
             9.0.x
             10.0.x
+      # So the test that writes tags into photos runs here too (it is skipped without ExifTool).
+      - name: Install ExifTool
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then choco install exiftool -y --no-progress; else brew install exiftool; fi
       - run: dotnet build -c Release
       - run: dotnet test -c Release --no-build
