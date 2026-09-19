@@ -1,0 +1,85 @@
+# Builds the Windows installer and publishes it as a GitHub release, which the installed app
+# picks up as an automatic update. Triggered by a plain version tag like 0.1.0: either pushed
+# with git, or created together with a release in the GitHub UI (the files are then added to
+# that release, keeping its notes).
+#
+# Optional configuration (Settings → Secrets and variables → Actions):
+#   vars.UPDATE_REPO_URL      Public repo that hosts releases, if this repo is private.
+#                             Defaults to this repo. The app downloads updates from here.
+#   secrets.RELEASE_TOKEN     PAT with contents:write on UPDATE_REPO_URL (only if it's another repo).
+#   Code signing with Azure Trusted Signing (skipped if AZURE_CLIENT_ID is not set):
+#   secrets.AZURE_TENANT_ID, secrets.AZURE_CLIENT_ID, secrets.AZURE_CLIENT_SECRET
+#   vars.AZURE_SIGNING_ENDPOINT (e.g. https://weu.codesigning.azure.net/),
+#   vars.AZURE_SIGNING_ACCOUNT, vars.AZURE_SIGNING_PROFILE
+
+name: Release
+
+on:
+  push:
+    tags: ['[0-9]+.[0-9]+.[0-9]+']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    env:
+      UPDATE_REPO_URL: ${{ vars.UPDATE_REPO_URL || format('{0}/{1}', github.server_url, github.repository) }}
+      RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          # SDK 10 builds and tests; the 9.0 runtime runs the net9.0 targets.
+          dotnet-version: |
+            9.0.x
+            10.0.x
+
+      - name: Version from tag
+        shell: bash
+        run: echo "VERSION=$GITHUB_REF_NAME" >> "$GITHUB_ENV"
+
+      # The safety core must pass on Windows before anything reaches the user.
+      - run: dotnet test -c Release
+
+      - name: Publish
+        run: >
+          dotnet publish src/EasyImageImporter.App -c Release -r win-x64 --self-contained
+          -p:PublishReadyToRun=true -p:Version=${{ env.VERSION }}
+          -p:UpdateRepoUrl=${{ env.UPDATE_REPO_URL }} -o publish
+
+      - run: dotnet tool install -g vpk --version 1.2.0
+
+      - name: Fetch previous release (enables small delta updates)
+        continue-on-error: true
+        run: vpk download github --repoUrl ${{ env.UPDATE_REPO_URL }} --token ${{ env.RELEASE_TOKEN }} -o releases
+
+      - name: Pack installer
+        shell: bash
+        run: |
+          SIGN=()
+          if [ -n "$AZURE_CLIENT_ID" ]; then
+            cat > signing.json <<JSON
+          {
+            "Endpoint": "${{ vars.AZURE_SIGNING_ENDPOINT }}",
+            "CodeSigningAccountName": "${{ vars.AZURE_SIGNING_ACCOUNT }}",
+            "CertificateProfileName": "${{ vars.AZURE_SIGNING_PROFILE }}"
+          }
+          JSON
+            SIGN=(--azureTrustedSignFile signing.json)
+          else
+            echo "::warning::No signing configured; Windows will show an 'unknown publisher' warning."
+          fi
+          vpk pack --packId EasyImageImporter --packVersion "$VERSION" --packDir publish \
+            --mainExe EasyImageImporter.exe --packTitle "EasyImageImporter" --packAuthors "Henrik Slaaen" \
+            --icon src/EasyImageImporter.App/Assets/icon.ico --shortcuts Desktop,StartMenuRoot \
+            -o releases "${SIGN[@]}"
+
+      - name: Publish GitHub release
+        run: >
+          vpk upload github --repoUrl ${{ env.UPDATE_REPO_URL }} --token ${{ env.RELEASE_TOKEN }}
+          -o releases --publish --merge --releaseName "EasyImageImporter ${{ env.VERSION }}" --tag ${{ env.VERSION }}
