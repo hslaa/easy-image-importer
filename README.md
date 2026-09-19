@@ -1,4 +1,4 @@
-# Viltkamera Import
+# EasyImageImporter
 
 Guided desktop app that takes a trail-camera SD card from "insert" to "safely archived, card wiped".
 Windows is the target; development happens on macOS.
@@ -15,7 +15,7 @@ dotnet test
 Run the app against scratch folders so it doesn't touch your real Pictures folder:
 
 ```bash
-VILTKAMERA_DATA=/tmp/vk/data VILTKAMERA_ARCHIVE=/tmp/vk/archive dotnet run --project src/Viltkamera.App
+EASYIMAGEIMPORTER_DATA=/tmp/vk/data EASYIMAGEIMPORTER_ARCHIVE=/tmp/vk/archive dotnet run --project src/EasyImageImporter.App
 ```
 
 A fake SD card on macOS: a FAT disk image with a `DCIM` folder.
@@ -39,8 +39,8 @@ git tag v0.1.0 && git push origin v0.1.0
 Configuration for signing and for hosting releases in a separate public repo is described at
 the top of [.github/workflows/release.yml](.github/workflows/release.yml).
 
-The installer is `ViltkameraImport-win-Setup.exe`. It installs per user (no admin rights),
+The installer is `EasyImageImporter-win-Setup.exe`. It installs per user (no admin rights),
 adds Desktop and Start menu shortcuts, and starts the app in the tray when Windows starts.
-The app's data (database, staging copies) lives in `%LOCALAPPDATA%\Viltkamera`, deliberately
-separate from the install folder `%LOCALAPPDATA%\ViltkameraImport`, so uninstalling never
-removes staged images.
+The app's data (database, staging copies) lives in `%LOCALAPPDATA%\EasyImageImporterData`, deliberately
+separate from the install folder `%LOCALAPPDATA%\EasyImageImporter`, so uninstalling never
+removes staged images. Imported images go to `Pictures\Viltkamera\`.

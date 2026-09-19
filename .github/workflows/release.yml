@@ -43,7 +43,7 @@ jobs:
 
       - name: Publish
         run: >
-          dotnet publish src/Viltkamera.App -c Release -r win-x64 --self-contained
+          dotnet publish src/EasyImageImporter.App -c Release -r win-x64 --self-contained
           -p:PublishReadyToRun=true -p:Version=${{ env.VERSION }}
           -p:UpdateRepoUrl=${{ env.UPDATE_REPO_URL }} -o publish
 
@@ -69,12 +69,12 @@ jobs:
           else
             echo "::warning::No signing configured; Windows will show an 'unknown publisher' warning."
           fi
-          vpk pack --packId ViltkameraImport --packVersion "$VERSION" --packDir publish \
-            --mainExe Viltkamera.exe --packTitle "Viltkamera Import" --packAuthors "Henrik Slaaen" \
-            --icon src/Viltkamera.App/Assets/icon.ico --shortcuts Desktop,StartMenuRoot \
+          vpk pack --packId EasyImageImporter --packVersion "$VERSION" --packDir publish \
+            --mainExe EasyImageImporter.exe --packTitle "EasyImageImporter" --packAuthors "Henrik Slaaen" \
+            --icon src/EasyImageImporter.App/Assets/icon.ico --shortcuts Desktop,StartMenuRoot \
             -o releases "${SIGN[@]}"
 
       - name: Publish GitHub release
         run: >
           vpk upload github --repoUrl ${{ env.UPDATE_REPO_URL }} --token ${{ env.RELEASE_TOKEN }}
-          -o releases --publish --releaseName "Viltkamera Import ${{ env.VERSION }}" --tag v${{ env.VERSION }}
+          -o releases --publish --releaseName "EasyImageImporter ${{ env.VERSION }}" --tag v${{ env.VERSION }}

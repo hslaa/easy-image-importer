@@ -1,4 +1,4 @@
-# Viltkamera Import — Technical Plan
+# EasyImageImporter — Technical Plan
 
 Companion to [viltkamera-app-spec.md](viltkamera-app-spec.md). The spec says *what*; this says *how*.
 
@@ -10,7 +10,7 @@ Companion to [viltkamera-app-spec.md](viltkamera-app-spec.md). The spec says *wh
 |---|---|---|
 | Runtime | **.NET 10 (LTS)**, C# (currently built on .NET 9 until the .NET 10 SDK is installed; one line in `Directory.Build.props`) | One language end to end. Runs natively on the dev Mac (Apple Silicon); `dotnet publish -r win-x64` builds the Windows app straight from macOS. |
 | UI | **Avalonia 12** + CommunityToolkit.Mvvm, Fluent theme | Same Skia renderer on Mac and Windows, so what you see in dev is what the user sees. Built-in `TrayIcon`. |
-| State | **SQLite** (Microsoft.Data.Sqlite, WAL mode) | A transactional journal is what makes copy/review resumable. One file in `%LOCALAPPDATA%`. |
+| State | **SQLite** (Microsoft.Data.Sqlite, WAL mode) | A transactional journal is what makes copy/review resumable. One file in `%LOCALAPPDATA%\EasyImageImporterData`. |
 | Hashing | **SHA-256** (`System.Security.Cryptography`, hardware-accelerated) | Boring and standard. SD-card read speed is the bottleneck, not the hash. |
 | Image decode / thumbs | **SkiaSharp** (already an Avalonia dependency), with the EXIF embedded thumbnail first | Scaled JPEG decode (1/8) is fast on old CPUs. |
 | Metadata read | **MetadataExtractor** (pure .NET) | Fast `DateTimeOriginal`, make/model and serial at scan time. |
@@ -25,22 +25,22 @@ Companion to [viltkamera-app-spec.md](viltkamera-app-spec.md). The spec says *wh
 ## 1. Solution layout
 
 ```
-Viltkamera.sln
+EasyImageImporter.sln
 src/
-  Viltkamera.Core/          Domain + pipeline. No UI, no platform code. Most tests target this.
+  EasyImageImporter.Core/          Domain + pipeline. No UI, no platform code. Most tests target this.
     Cards/                  Card detection abstraction, card identity
     Import/                 Scan, copy+verify, session state machine, finalize, undo
     Grouping/               Sequence (hendelse) + site (sted) grouping, background plates, image similarity
     Metadata/               EXIF read, ExifTool writer, OM DENNE MAPPEN.txt
     Storage/                SQLite schema, migrations, repositories
     Naming/                 Folder/file naming, sanitising, collision handling
-  Viltkamera.Ml/            (later) ONNX Runtime wrappers: detector, classifier
-  Viltkamera.Platform/      IPlatform: Pictures folder, open-in-Explorer/Finder, autostart, single instance
+  EasyImageImporter.Ml/            (later) ONNX Runtime wrappers: detector, classifier
+  EasyImageImporter.Platform/      IPlatform: Pictures folder, open-in-Explorer/Finder, autostart, single instance
     Windows/  MacOS/
-  Viltkamera.App/           Avalonia app: tray, windows, views, view-models, nb-NO resources
+  EasyImageImporter.App/           Avalonia app: tray, windows, views, view-models, nb-NO resources
 tests/
-  Viltkamera.Core.Tests/
-  Viltkamera.Core.Tests/Grouping/  Golden tests on real card dumps: expected sequences + site boundaries
+  EasyImageImporter.Core.Tests/
+  EasyImageImporter.Core.Tests/Grouping/  Golden tests on real card dumps: expected sequences + site boundaries
   fixtures/cards/           Synthetic cards (public camera-trap data), home-made cards, later the user's real ones
 tools/
   exiftool/                 Pinned ExifTool builds for win-x64 and macOS
@@ -97,7 +97,7 @@ Failure handling:
 | Disk full | Pre-flight check before copying: bytes needed + 10 % margin, against both staging and the final volume. If still hit mid-copy: pause with a plain message, never a half-written "verified" file. |
 | Duplicate names across placements | Staging uses DB ids, not camera filenames, so collisions are impossible until naming (§5). |
 
-**Staging location:** `%LOCALAPPDATA%\Viltkamera\staging`. If it is on the same volume as the destination, finalize is a rename (instant, no extra space). If not, finalize does copy → verify → delete-from-staging with the same routine.
+**Staging location:** `%LOCALAPPDATA%\EasyImageImporterData\staging`. If it is on the same volume as the destination, finalize is a rename (instant, no extra space). If not, finalize does copy → verify → delete-from-staging with the same routine.
 
 ### 2.5 "Discard never means delete"
 
