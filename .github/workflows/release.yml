@@ -1,5 +1,7 @@
 # Builds the Windows installer and publishes it as a GitHub release, which the installed app
-# picks up as an automatic update. Triggered by pushing a tag like v0.1.0.
+# picks up as an automatic update. Triggered by a plain version tag like 0.1.0: either pushed
+# with git, or created together with a release in the GitHub UI (the files are then added to
+# that release, keeping its notes).
 #
 # Optional configuration (Settings → Secrets and variables → Actions):
 #   vars.UPDATE_REPO_URL      Public repo that hosts releases, if this repo is private.
@@ -14,7 +16,7 @@ name: Release
 
 on:
   push:
-    tags: ['v*']
+    tags: ['[0-9]+.[0-9]+.[0-9]+']
 
 permissions:
   contents: write
@@ -39,7 +41,7 @@ jobs:
 
       - name: Version from tag
         shell: bash
-        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+        run: echo "VERSION=$GITHUB_REF_NAME" >> "$GITHUB_ENV"
 
       # The safety core must pass on Windows before anything reaches the user.
       - run: dotnet test -c Release
@@ -80,4 +82,4 @@ jobs:
       - name: Publish GitHub release
         run: >
           vpk upload github --repoUrl ${{ env.UPDATE_REPO_URL }} --token ${{ env.RELEASE_TOKEN }}
-          -o releases --publish --releaseName "EasyImageImporter ${{ env.VERSION }}" --tag v${{ env.VERSION }}
+          -o releases --publish --merge --releaseName "EasyImageImporter ${{ env.VERSION }}" --tag ${{ env.VERSION }}

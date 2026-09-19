@@ -29,11 +29,12 @@ Logs go to `<data>/logs/`.
 
 ## Release
 
-Push a tag. The release workflow tests on Windows, builds the installer and publishes it as a
+Push a plain version tag (no `v` prefix), or create a release with a new tag like `0.1.0` in
+the GitHub UI. The release workflow tests on Windows, builds the installer and attaches it to the
 GitHub release. Installed copies download it in the background and switch to it on next start.
 
 ```bash
-git tag v0.1.0 && git push origin v0.1.0
+git tag 0.1.0 && git push origin 0.1.0
 ```
 
 Configuration for signing and for hosting releases in a separate public repo is described at
