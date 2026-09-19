@@ -64,6 +64,7 @@ public sealed class ImportUndo(IFileSystem fs, ImportStore store, AppPaths paths
         // Our own summary goes; the folder only if nothing else was put in it.
         var summary = Path.Combine(import.FolderPath, Finalizer.SummaryFileName);
         if (fs.FileExists(summary)) fs.Delete(summary);
+        fs.DeleteDirectoryIfEmpty(Path.Combine(import.FolderPath, Finalizer.DiscardedFolderName));
         if (fs.DeleteDirectoryIfEmpty(import.FolderPath))
             fs.DeleteDirectoryIfEmpty(Path.GetDirectoryName(import.FolderPath)!); // the year folder
 

@@ -49,13 +49,24 @@ public sealed record SessionFile(
     FileStatus Status,
     int Attempts,
     string? StagingName,
-    string? LastError)
+    string? LastError,
+    MediaKind? Kind = null,
+    DateTime? TakenAt = null,
+    string? TakenAtSource = null,
+    string? Camera = null,
+    long? SequenceId = null,
+    bool Keep = true)
 {
     public string FileName => RelPath[(RelPath.LastIndexOf('/') + 1)..];
     public string SourcePath(string cardRoot) => Path.Combine(cardRoot, RelPath.Replace('/', Path.DirectorySeparatorChar));
 }
 
-public sealed record ImportRecord(long Id, long SessionId, string FolderPath, DateTime CreatedUtc, int ImageCount, DateTime? UndoneUtc);
+/// <param name="ImageCount">Images kept (in the folder itself).</param>
+/// <param name="DiscardedCount">Images in the folder's "Sortert bort" subfolder.</param>
+public sealed record ImportRecord(long Id, long SessionId, string FolderPath, DateTime CreatedUtc, int ImageCount,
+    DateTime? UndoneUtc, int DiscardedCount = 0);
+
+public enum MediaKind { Image, Video }
 
 public sealed record ImportMove(long ImportId, long FileId, string FromPath, string ToPath, bool Done, bool Undone);
 

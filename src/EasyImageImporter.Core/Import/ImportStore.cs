@@ -7,12 +7,13 @@ namespace EasyImageImporter.Core.Import;
 public sealed record ScannedFile(string RelPath, long Size, DateTime MtimeUtc);
 
 /// <summary>All SQL for import sessions lives here. Every state change is a single transaction.</summary>
-public sealed class ImportStore(Database db, TimeProvider? time = null)
+public sealed partial class ImportStore(Database db, TimeProvider? time = null)
 {
     private readonly TimeProvider _time = time ?? TimeProvider.System;
 
     private const string FileColumns =
-        "id, session_id, rel_path, size, mtime_utc, sha256, status, attempts, staging_name, last_error";
+        "id, session_id, rel_path, size, mtime_utc, sha256, status, attempts, staging_name, last_error, " +
+        "media_kind, taken_at, taken_at_source, camera, sequence_id, keep";
 
     // ---- Sessions -------------------------------------------------------------------------
 
@@ -159,13 +160,18 @@ public sealed class ImportStore(Database db, TimeProvider? time = null)
     // ---- Imports --------------------------------------------------------------------------
 
     /// <summary>Records the full move plan and flips the session to Finalizing in one transaction.</summary>
-    public ImportRecord CreateImportPlan(long sessionId, string folderPath, IReadOnlyList<(long FileId, string From, string To)> moves)
+    public ImportRecord CreateImportPlan(long sessionId, string folderPath,
+        IReadOnlyList<(long FileId, string From, string To)> moves, int discardedCount = 0)
     {
         using var c = db.Open();
         using var tx = c.BeginTransaction();
         var importId = (long)Scalar(c, tx,
-            "INSERT INTO imports(session_id, folder_path, created_utc, image_count) VALUES ($s, $f, $now, $n) RETURNING id;",
-            ("$s", sessionId), ("$f", folderPath), ("$now", Now()), ("$n", moves.Count))!;
+            """
+            INSERT INTO imports(session_id, folder_path, created_utc, image_count, discarded_count)
+            VALUES ($s, $f, $now, $n, $d) RETURNING id;
+            """,
+            ("$s", sessionId), ("$f", folderPath), ("$now", Now()), ("$n", moves.Count - discardedCount),
+            ("$d", discardedCount))!;
 
         foreach (var (fileId, from, to) in moves)
             Execute(c, tx, "INSERT INTO import_moves(import_id, file_id, from_path, to_path) VALUES ($i, $f, $from, $to);",
@@ -277,19 +283,25 @@ public sealed class ImportStore(Database db, TimeProvider? time = null)
     {
         using var c = db.Open();
         using var cmd = Command(c, null,
-            $"SELECT id, session_id, folder_path, created_utc, image_count, undone_utc FROM imports {where};", args);
+            $"SELECT id, session_id, folder_path, created_utc, image_count, undone_utc, discarded_count FROM imports {where};", args);
         var result = new List<ImportRecord>();
         using var r = cmd.ExecuteReader();
         while (r.Read())
             result.Add(new ImportRecord(r.GetInt64(0), r.GetInt64(1), r.GetString(2), Parse(r.GetString(3)), r.GetInt32(4),
-                r.IsDBNull(5) ? null : Parse(r.GetString(5))));
+                r.IsDBNull(5) ? null : Parse(r.GetString(5)), r.GetInt32(6)));
         return result;
     }
 
     private static SessionFile ReadFile(SqliteDataReader r) => new(
         r.GetInt64(0), r.GetInt64(1), r.GetString(2), r.GetInt64(3), Parse(r.GetString(4)),
         r.IsDBNull(5) ? null : r.GetString(5), Enum.Parse<FileStatus>(r.GetString(6)), r.GetInt32(7),
-        r.IsDBNull(8) ? null : r.GetString(8), r.IsDBNull(9) ? null : r.GetString(9));
+        r.IsDBNull(8) ? null : r.GetString(8), r.IsDBNull(9) ? null : r.GetString(9),
+        r.IsDBNull(10) ? null : Enum.Parse<MediaKind>(r.GetString(10)),
+        r.IsDBNull(11) ? null : ParseLocal(r.GetString(11)),
+        r.IsDBNull(12) ? null : r.GetString(12),
+        r.IsDBNull(13) ? null : r.GetString(13),
+        r.IsDBNull(14) ? null : r.GetInt64(14),
+        r.GetInt64(15) != 0);
 
     private void Execute(string sql, params (string, object?)[] args)
     {
@@ -327,4 +339,10 @@ public sealed class ImportStore(Database db, TimeProvider? time = null)
     private string Now() => Format(_time.GetUtcNow().UtcDateTime);
     private static string Format(DateTime utc) => utc.ToString("O", CultureInfo.InvariantCulture);
     private static DateTime Parse(string s) => DateTime.Parse(s, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
+
+    /// <summary>Camera time: local, no time zone. Stored as "yyyy-MM-ddTHH:mm:ss" so it sorts as text.</summary>
+    private const string LocalFormat = "yyyy-MM-dd'T'HH:mm:ss";
+    private static string FormatLocal(DateTime t) => t.ToString(LocalFormat, CultureInfo.InvariantCulture);
+    private static DateTime ParseLocal(string s) =>
+        DateTime.ParseExact(s, LocalFormat, CultureInfo.InvariantCulture, DateTimeStyles.None);
 }
