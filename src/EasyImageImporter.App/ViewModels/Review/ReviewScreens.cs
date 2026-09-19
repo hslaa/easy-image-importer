@@ -47,11 +47,25 @@ internal static class Rows
 
 /// <summary>All visits on the card. "Default is keep everything": the user actively sorts away.</summary>
 public sealed partial class ReviewScreen(
-    ReviewOverview overview, IReadOnlyList<object> rows, string? alreadyImportedText, string? failedText,
-    Action next, Func<Task> retryFailed) : Screen
+    ReviewOverview overview, IReadOnlyList<object> rows, IReadOnlyList<FilterChip> filters, string? filterText,
+    AnimalRecognition recognition, string? alreadyImportedText, string? failedText, Action next, Func<Task> retryFailed) : Screen
 {
     /// <summary>A <see cref="PlaceHeader"/> followed by that place's <see cref="VisitRow"/>s, place by place.</summary>
     public IReadOnlyList<object> Rows { get; } = rows;
+
+    /// <summary>Alle · Ravn (5) · Kråkefugl (3) · Tomme (12) · Usikre (4). Empty until there is something to filter on.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasFilters))]
+    private IReadOnlyList<FilterChip> _filters = filters;
+
+    public bool HasFilters => Filters.Count > 1;
+
+    public void FiltersChanged(IReadOnlyList<FilterChip> filters) => Filters = filters;
+
+    /// <summary>"Viser 12 av 60 hendelser" while a filter is on.</summary>
+    public string? FilterText { get; } = filterText;
+
+    public AnimalRecognition Recognition { get; } = recognition;
 
     public string Summary { get; } =
         $"{Review.Rows.Count(overview.ImageCount)} i {overview.Visits.Count:N0} " +
@@ -79,29 +93,67 @@ public sealed partial class ReviewScreen(
     private Task Retry() => retryFailed();
 }
 
-public sealed partial class VisitCard(Visit visit, int number, LazyThumbnail cover, Action<Visit> open, Action<Visit, bool> setKeep)
-    : ObservableObject
+public sealed partial class FilterChip(string text, bool selected, Action select) : ObservableObject
 {
+    public string Text { get; } = text;
+    public bool IsSelected { get; } = selected;
+
+    [RelayCommand]
+    private void Select() => select();
+}
+
+/// <summary>
+/// One visit in the overview. Updated in place when the animal recognition has looked at it, so
+/// the list doesn't jump while the user is scrolling.
+/// </summary>
+public sealed partial class VisitCard(
+    Visit visit, int number, LazyThumbnail cover, Action<Visit> open, Action<Visit, bool> setKeep,
+    Action<Visit> accept, Action<Visit> dismiss) : ObservableObject
+{
+    private Visit _visit = visit;
+
+    public long VisitId => _visit.Id;
     public LazyThumbnail Cover { get; } = cover;
-    public string Title { get; } = visit.Label is { } label
-        ? $"{number}. {label} · {Rows.TimeSpanText(visit.Start, visit.End)}"
-        : $"{number}. {Rows.TimeSpanText(visit.Start, visit.End)}";
-    public string Details { get; } = $"{Rows.DateText(visit.Start)} · {Rows.Count(visit.Frames.Count)}";
+    public string Title => _visit.Label is { } label
+        ? $"{number}. {label} · {Rows.TimeSpanText(_visit.Start, _visit.End)}"
+        : $"{number}. {Rows.TimeSpanText(_visit.Start, _visit.End)}";
+    public string Details => $"{Rows.DateText(_visit.Start)} · {Rows.Count(_visit.Frames.Count)}";
 
-    public string KeepText { get; } =
-        visit.KeptCount == visit.Frames.Count ? "Alle beholdes"
-        : visit.KeptCount == 0 ? "Sorteres bort"
-        : $"{visit.KeptCount:N0} av {visit.Frames.Count:N0} beholdes";
+    public string KeepText =>
+        _visit.KeptCount == _visit.Frames.Count ? "Alle beholdes"
+        : _visit.KeptCount == 0 ? "Sorteres bort"
+        : $"{_visit.KeptCount:N0} av {_visit.Frames.Count:N0} beholdes";
 
-    public bool IsDiscarded { get; } = visit.KeptCount == 0;
-    public double Opacity => IsDiscarded ? 0.45 : 1;
+    public bool IsDiscarded => _visit.KeptCount == 0;
     public string ToggleText => IsDiscarded ? "Behold" : "Sorter bort";
 
-    [RelayCommand]
-    private void Open() => open(visit);
+    /// <summary>Looks empty: shown a bit faded, but never hidden or sorted away on its own.</summary>
+    public bool LooksEmpty => _visit.Suggestion?.Kind == SuggestionKind.Empty
+                              && _visit.SuggestionState != SuggestionState.Dismissed && _visit.Label is null;
+    public double Opacity => IsDiscarded ? 0.45 : LooksEmpty ? 0.7 : 1;
+
+    public bool HasQuestion => _visit.HasOpenSuggestion && _visit.Suggestion!.Kind != SuggestionKind.Empty;
+    public string Question => _visit.Suggestion is { } s
+        ? $"{s.Name}? {(s.Kind == SuggestionKind.Unsure ? "(usikker)" : $"{s.Score:P0}")}"
+        : "";
+
+    public void Update(Visit visit)
+    {
+        _visit = visit;
+        OnPropertyChanged(string.Empty); // everything may have changed
+    }
 
     [RelayCommand]
-    private void Toggle() => setKeep(visit, IsDiscarded);
+    private void Open() => open(_visit);
+
+    [RelayCommand]
+    private void Toggle() => setKeep(_visit, IsDiscarded);
+
+    [RelayCommand]
+    private void Accept() => accept(_visit);
+
+    [RelayCommand]
+    private void Dismiss() => dismiss(_visit);
 }
 
 /// <summary>One visit: every frame, keep or sort away one by one, split and merge.</summary>
@@ -120,6 +172,15 @@ public sealed partial class VisitScreen : Screen
         _split = split;
         _label = visit.Label ?? "";
         AnimalSuggestions = review.AnimalSuggestions();
+        SuggestionText = visit.HasOpenSuggestion && visit.Suggestion is { } s
+            ? s.Kind switch
+            {
+                SuggestionKind.Empty => "Forslag: ser tom ut.",
+                SuggestionKind.Unsure => $"Forslag: {s.Name}? (usikker)",
+                _ => $"Forslag: {s.Name} ({s.Score:P0})",
+            }
+            : null;
+        CanUseSuggestion = visit.HasOpenSuggestion && visit.Suggestion?.Kind != SuggestionKind.Empty;
         Tiles = tiles;
         Rows = Review.Rows.Of(tiles, 4, items => new FrameRow(items));
         Title = $"Hendelse {number} av {total}";
@@ -146,6 +207,18 @@ public sealed partial class VisitScreen : Screen
     public IReadOnlyList<string> AnimalSuggestions { get; }
 
     partial void OnLabelChanged(string value) => _review.SetLabel(_visit, value);
+
+    public string? SuggestionText { get; }
+    public bool CanUseSuggestion { get; private set; }
+
+    [RelayCommand]
+    private void UseSuggestion()
+    {
+        _review.AcceptSuggestion(_visit);
+        Label = _visit.Suggestion!.Name;
+        CanUseSuggestion = false;
+        OnPropertyChanged(nameof(CanUseSuggestion));
+    }
     [ObservableProperty] private FrameViewer? _viewer;
 
     public IRelayCommand BackCommand { get; }

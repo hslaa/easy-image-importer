@@ -25,6 +25,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private readonly ImportUndo _undo;
     private readonly ReviewService _review;
     private readonly ThumbnailLoader _thumbnails;
+    private readonly AnimalRecognition _recognition;
+    private ReviewFlow? _flow;
     private readonly Recovery _recovery;
     private readonly CardWatcher _watcher = new(new SystemDriveProvider());
 
@@ -55,6 +57,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _undo = new ImportUndo(fs, _store, paths);
         _review = new ReviewService(_store, paths);
         _thumbnails = new ThumbnailLoader(new ThumbnailCache(Path.Combine(paths.DataRoot, "thumbs")));
+        _recognition = new AnimalRecognition(Path.Combine(paths.DataRoot, "models"), _store, _review);
         _recovery = new Recovery(_store, _finalizer, _undo);
         Screen = Idle();
     }
@@ -185,9 +188,12 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             _store.RetryFailed(session.Id);
             return CopyAsync(session);
         });
-        var flow = new ReviewFlow(session.Id, _store, _review, _thumbnails, Show, save, retry);
+        _flow?.Detach();
+        var flow = _flow = new ReviewFlow(session.Id, _store, _review, _thumbnails, _recognition, Show, save, retry);
         if (flow.HasImages)
         {
+            // Looks for animals and empty frames in the background while the user reviews.
+            _recognition.Start(session.Id);
             flow.ShowOverview();
             return;
         }
@@ -200,6 +206,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     private async Task SaveAsync(Session session)
     {
+        _recognition.Stop();
         var screen = Working("Lagrer bildene…");
         screen.IsIndeterminate = false;
         Show(screen);
@@ -312,5 +319,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     private static string Gigabytes(long bytes) => (bytes / 1_000_000_000.0).ToString("N1");
 
-    public void Dispose() => _watcher.Dispose();
+    public void Dispose()
+    {
+        _watcher.Dispose();
+        _recognition.Dispose();
+    }
 }

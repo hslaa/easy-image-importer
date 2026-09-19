@@ -32,6 +32,10 @@
                 <AutoCompleteBox Text="{Binding Label, UpdateSourceTrigger=LostFocus}" ItemsSource="{Binding AnimalSuggestions}"
                                  FilterMode="StartsWith" MinimumPrefixLength="1" Width="260" FontSize="18"
                                  PlaceholderText="F.eks. Kongeørn (valgfritt)" />
+                <TextBlock Classes="muted" Text="{Binding SuggestionText}" VerticalAlignment="Center"
+                           IsVisible="{Binding SuggestionText, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                <Button Classes="link" Content="Bruk forslaget" Command="{Binding UseSuggestionCommand}"
+                        IsVisible="{Binding CanUseSuggestion}" />
             </StackPanel>
 
             <WrapPanel DockPanel.Dock="Top" Margin="0,12,0,0">
