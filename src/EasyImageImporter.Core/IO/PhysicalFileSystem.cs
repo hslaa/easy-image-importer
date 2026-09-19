@@ -38,6 +38,13 @@ public sealed class PhysicalFileSystem : IFileSystem
 
     public void Delete(string path) => File.Delete(path);
 
+    public bool DeleteDirectoryIfEmpty(string path)
+    {
+        if (!Directory.Exists(path) || Directory.EnumerateFileSystemEntries(path).Any()) return false;
+        Directory.Delete(path, recursive: false);
+        return true;
+    }
+
     public void WriteAllText(string path, string contents, System.Text.Encoding encoding) =>
         File.WriteAllText(path, contents, encoding);
 

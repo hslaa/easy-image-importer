@@ -23,6 +23,8 @@ public sealed class CardEraser(IFileSystem fs, ImportStore store)
     public EraseDecision Evaluate(long sessionId)
     {
         var session = store.GetSession(sessionId);
+        // Already empty: no erase step at all, and nothing to explain.
+        if (session.State == SessionState.CardErased) return new EraseDecision(false, 0, null);
         if (session.State != SessionState.Imported)
             return EraseDecision.Refuse("Bildene er ikke lagret ennå.");
 
@@ -35,7 +37,8 @@ public sealed class CardEraser(IFileSystem fs, ImportStore store)
             return EraseDecision.Refuse("Noen bilder er ikke kopiert ennå.");
 
         var remaining = counts.Verified + counts.Duplicate;
-        return remaining == 0 ? EraseDecision.Refuse("Det er ingen bilder å slette.") : new EraseDecision(true, remaining, null);
+        // Nothing left on the card is not a problem to explain; there is simply no erase step.
+        return remaining == 0 ? new EraseDecision(false, 0, null) : new EraseDecision(true, remaining, null);
     }
 
     public EraseOutcome Erase(long sessionId, IProgress<int>? progress = null, CancellationToken ct = default)

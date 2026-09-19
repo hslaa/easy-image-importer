@@ -13,6 +13,8 @@ public enum SessionState
     Finalizing,
     Imported,
     CardErased,
+    /// <summary>Moving an import back into staging. Finished by recovery if interrupted.</summary>
+    Undoing,
 }
 
 public enum FileStatus
@@ -55,7 +57,7 @@ public sealed record SessionFile(
 
 public sealed record ImportRecord(long Id, long SessionId, string FolderPath, DateTime CreatedUtc, int ImageCount, DateTime? UndoneUtc);
 
-public sealed record ImportMove(long ImportId, long FileId, string FromPath, string ToPath, bool Done);
+public sealed record ImportMove(long ImportId, long FileId, string FromPath, string ToPath, bool Done, bool Undone);
 
 public sealed record KnownFile(string Sha256, long Size, long ImportId, string FinalPath);
 

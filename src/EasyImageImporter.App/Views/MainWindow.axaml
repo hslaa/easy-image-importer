@@ -16,7 +16,10 @@
                 <TextBlock Classes="title" Text="Sett inn minnekortet fra viltkameraet." />
                 <TextBlock Classes="muted"
                            Text="Bildene blir kopiert og kontrollert før du gjør noe annet. Ingenting blir slettet fra kortet uten at du ber om det." />
-                <Button Content="Velg mappe selv …" Command="{Binding ChooseFolderCommand}" Margin="0,16,0,0" />
+                <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,16,0,0">
+                    <Button Content="Mine importer" Command="{Binding ShowImportsCommand}" />
+                    <Button Content="Velg mappe selv …" Command="{Binding ChooseFolderCommand}" />
+                </StackPanel>
             </StackPanel>
         </DataTemplate>
 
@@ -61,25 +64,90 @@
                 <Border Height="1" Background="#D9D5CA" Margin="0,16" />
 
                 <!-- The erase step only exists once every image is verified. -->
-                <StackPanel Spacing="12" IsVisible="{Binding IsAsking}">
-                    <TextBlock Text="{Binding EraseQuestion}" />
-                    <Button Content="Slett bildene fra kortet …" Command="{Binding AskEraseCommand}" />
-                </StackPanel>
-
-                <StackPanel Spacing="12" IsVisible="{Binding IsConfirming}">
-                    <TextBlock FontWeight="SemiBold"
-                               Text="Er du sikker? Bildene er trygt lagret på datamaskinen, men blir borte fra kortet." />
-                    <StackPanel Orientation="Horizontal" Spacing="12">
-                        <Button Content="Avbryt" Command="{Binding CancelEraseCommand}" />
-                        <Button Classes="danger" Content="{Binding ConfirmText}" Command="{Binding ConfirmEraseCommand}" />
+                <StackPanel Spacing="12" IsVisible="{Binding CanErase}">
+                    <StackPanel Spacing="12" IsVisible="{Binding !Erase.IsAsking}">
+                        <TextBlock Text="{Binding EraseQuestion}" />
+                        <Button Content="Slett bildene fra kortet …" Command="{Binding Erase.AskCommand}" />
+                    </StackPanel>
+                    <StackPanel Spacing="12" IsVisible="{Binding Erase.IsAsking}">
+                        <TextBlock FontWeight="SemiBold"
+                                   Text="Er du sikker? Bildene er trygt lagret på datamaskinen, men blir borte fra kortet." />
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <Button Content="Avbryt" Command="{Binding Erase.CancelCommand}" />
+                            <Button Classes="danger" Content="{Binding ConfirmText}" Command="{Binding Erase.ConfirmCommand}" />
+                        </StackPanel>
                     </StackPanel>
                 </StackPanel>
 
                 <TextBlock Classes="warning" Text="{Binding EraseRefusal}" IsVisible="{Binding HasRefusal}" />
+
+                <!-- Deliberately quiet: undo is a way back, not a next step. -->
+                <StackPanel IsVisible="{Binding CanUndo}" Margin="0,8,0,0">
+                    <Button Classes="link" Content="Angre importen …" Command="{Binding Undo.AskCommand}"
+                            IsVisible="{Binding !Undo.IsAsking}" />
+                    <StackPanel Spacing="12" IsVisible="{Binding Undo.IsAsking}">
+                        <TextBlock Text="Angre importen? Bildene flyttes tilbake fra mappen, og du kan lagre dem på nytt. Ingen bilder blir slettet." />
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <Button Content="Avbryt" Command="{Binding Undo.CancelCommand}" />
+                            <Button Content="Ja, angre importen" Command="{Binding Undo.ConfirmCommand}" />
+                        </StackPanel>
+                    </StackPanel>
+                </StackPanel>
             </StackPanel>
+        </DataTemplate>
+
+        <DataTemplate DataType="vm:ImportsScreen">
+            <DockPanel>
+                <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,24">
+                    <TextBlock Classes="title" Text="Mine importer" VerticalAlignment="Center" />
+                    <Button Grid.Column="1" Content="Tilbake" Command="{Binding CloseCommand}" />
+                </Grid>
+                <TextBlock DockPanel.Dock="Top" Classes="muted" IsVisible="{Binding IsEmpty}"
+                           Text="Ingen bilder er lagret ennå. Når du har satt inn et minnekort og lagret bildene, dukker de opp her." />
+                <ScrollViewer>
+                    <ItemsControl ItemsSource="{Binding Rows}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="vm:ImportRow">
+                                <Border Background="White" CornerRadius="10" Padding="20,16" Margin="0,0,0,12">
+                                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+                                        <StackPanel Spacing="4">
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                            <TextBlock Classes="muted" FontSize="16" Text="{Binding Details}" />
+                                            <TextBlock Classes="warning" FontSize="16" IsVisible="{Binding FolderMissing}"
+                                                       Text="Mappen er flyttet eller slettet." />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                            <Button Classes="link" Content="Angre …" Command="{Binding Undo.AskCommand}"
+                                                    IsVisible="{Binding CanUndo}" />
+                                            <Button Classes="primary" Content="Åpne mappen" Command="{Binding OpenFolderCommand}"
+                                                    IsVisible="{Binding FolderExists}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Spacing="12" Margin="0,16,0,0"
+                                                    IsVisible="{Binding Undo.IsAsking}">
+                                            <TextBlock Text="Angre denne importen? Bildene flyttes tilbake fra mappen, og du kan lagre dem på nytt. Ingen bilder blir slettet." />
+                                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                                <Button Content="Avbryt" Command="{Binding Undo.CancelCommand}" />
+                                                <Button Content="Ja, angre importen" Command="{Binding Undo.ConfirmCommand}" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </DockPanel>
         </DataTemplate>
 
     </Window.DataTemplates>
 
-    <ContentControl Content="{Binding Screen}" Margin="48,40" />
+    <Panel>
+        <!-- Scrolls rather than cutting anything off on a small laptop screen. -->
+        <ScrollViewer IsVisible="{Binding Overlay, Converter={x:Static ObjectConverters.IsNull}}">
+            <ContentControl Content="{Binding Screen}" Margin="48,40" VerticalAlignment="Center" />
+        </ScrollViewer>
+        <!-- "Mine importer" replaces the view of the flow without stopping it; copying carries on. -->
+        <ContentControl Content="{Binding Overlay}" Margin="48,40"
+                        IsVisible="{Binding Overlay, Converter={x:Static ObjectConverters.IsNotNull}}" />
+    </Panel>
 </Window>
