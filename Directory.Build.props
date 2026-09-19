@@ -1,0 +1,10 @@
+<Project>
+  <PropertyGroup>
+    <!-- The plan targets .NET 10 (LTS). Switch to net10.0 once the .NET 10 SDK is installed. -->
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+</Project>

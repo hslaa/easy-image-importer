@@ -1,0 +1,85 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Viltkamera.App.ViewModels"
+        x:Class="Viltkamera.App.Views.MainWindow"
+        x:DataType="vm:MainViewModel"
+        Icon="/Assets/icon.png"
+        Title="Viltkamera Import"
+        Width="760" Height="540" MinWidth="560" MinHeight="420"
+        WindowStartupLocation="CenterScreen"
+        Background="#F6F4EE">
+
+    <Window.DataTemplates>
+
+        <DataTemplate DataType="vm:IdleScreen">
+            <StackPanel Spacing="16" VerticalAlignment="Center">
+                <TextBlock Classes="title" Text="Sett inn minnekortet fra viltkameraet." />
+                <TextBlock Classes="muted"
+                           Text="Bildene blir kopiert og kontrollert før du gjør noe annet. Ingenting blir slettet fra kortet uten at du ber om det." />
+                <Button Content="Velg mappe selv …" Command="{Binding ChooseFolderCommand}" Margin="0,16,0,0" />
+            </StackPanel>
+        </DataTemplate>
+
+        <DataTemplate DataType="vm:WorkingScreen">
+            <StackPanel Spacing="16" VerticalAlignment="Center">
+                <TextBlock Classes="title" Text="{Binding Title}" />
+                <TextBlock Text="{Binding Detail}" />
+                <ProgressBar Value="{Binding Progress}" IsIndeterminate="{Binding IsIndeterminate}" Maximum="100" />
+            </StackPanel>
+        </DataTemplate>
+
+        <DataTemplate DataType="vm:MessageScreen">
+            <StackPanel Spacing="16" VerticalAlignment="Center">
+                <TextBlock Classes="title" Text="{Binding Title}" />
+                <TextBlock Text="{Binding Body}" />
+                <Button Classes="primary" Content="{Binding ActionText}" Command="{Binding ActCommand}"
+                        IsVisible="{Binding HasAction}" Margin="0,16,0,0" />
+            </StackPanel>
+        </DataTemplate>
+
+        <DataTemplate DataType="vm:CopiedScreen">
+            <StackPanel Spacing="16" VerticalAlignment="Center">
+                <TextBlock Classes="title" Text="{Binding Title}" />
+                <TextBlock Classes="muted" Text="{Binding AlreadyImportedText}" IsVisible="{Binding HasAlreadyImported}" />
+                <StackPanel Spacing="12" IsVisible="{Binding HasFailed}">
+                    <TextBlock Classes="warning" Text="{Binding FailedText}" />
+                    <Button Content="Prøv å kopiere dem igjen" Command="{Binding RetryCommand}" />
+                </StackPanel>
+                <Button Classes="primary" Content="Lagre bildene" Command="{Binding SaveCommand}"
+                        IsVisible="{Binding HasImagesToSave}" Margin="0,16,0,0" />
+            </StackPanel>
+        </DataTemplate>
+
+        <DataTemplate DataType="vm:DoneScreen">
+            <StackPanel Spacing="16" VerticalAlignment="Center">
+                <TextBlock Classes="title" Text="{Binding Title}" />
+                <StackPanel Spacing="12" IsVisible="{Binding HasFolder}">
+                    <TextBlock Text="{Binding Folder}" FontFamily="Consolas, Menlo, monospace" FontSize="16" />
+                    <Button Classes="primary" Content="Åpne mappen" Command="{Binding OpenFolderCommand}" />
+                </StackPanel>
+
+                <Border Height="1" Background="#D9D5CA" Margin="0,16" />
+
+                <!-- The erase step only exists once every image is verified. -->
+                <StackPanel Spacing="12" IsVisible="{Binding IsAsking}">
+                    <TextBlock Text="{Binding EraseQuestion}" />
+                    <Button Content="Slett bildene fra kortet …" Command="{Binding AskEraseCommand}" />
+                </StackPanel>
+
+                <StackPanel Spacing="12" IsVisible="{Binding IsConfirming}">
+                    <TextBlock FontWeight="SemiBold"
+                               Text="Er du sikker? Bildene er trygt lagret på datamaskinen, men blir borte fra kortet." />
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <Button Content="Avbryt" Command="{Binding CancelEraseCommand}" />
+                        <Button Classes="danger" Content="{Binding ConfirmText}" Command="{Binding ConfirmEraseCommand}" />
+                    </StackPanel>
+                </StackPanel>
+
+                <TextBlock Classes="warning" Text="{Binding EraseRefusal}" IsVisible="{Binding HasRefusal}" />
+            </StackPanel>
+        </DataTemplate>
+
+    </Window.DataTemplates>
+
+    <ContentControl Content="{Binding Screen}" Margin="48,40" />
+</Window>
