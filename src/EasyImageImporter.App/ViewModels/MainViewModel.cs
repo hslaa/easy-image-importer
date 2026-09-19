@@ -39,7 +39,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     /// <summary>Raised when something needs the user's attention, so the app can bring its window forward.</summary>
     public event Action? AttentionNeeded;
 
-    [ObservableProperty] private Screen _screen;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Steps), nameof(HasSteps))]
+    private Screen _screen;
 
     /// <summary>"Mine importer", shown on top of the flow without interrupting it.</summary>
     [ObservableProperty] private ImportsScreen? _overlay;
@@ -94,7 +96,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         await RunGuardedAsync(async () =>
         {
             Log.Information("Card inserted at {Root}", root);
-            Show(Working("Leser kortet…"));
+            Show(Working("Leser kortet…", step: FlowStep.Copy));
             AttentionNeeded?.Invoke();
             var session = await Task.Run(() => _scanner.OpenSession(_scanner.Scan(root), label));
             if (session is null)
@@ -143,7 +145,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private async Task CopyAsync(Session session)
     {
         var total = _store.GetCounts(session.Id).Total;
-        var screen = Working($"Fant {total:N0} bilder på kortet.", "Kopierer…");
+        var screen = Working($"Fant {total:N0} bilder på kortet.", "Kopierer…", FlowStep.Copy);
         screen.IsIndeterminate = false;
         Show(screen);
 
@@ -162,13 +164,15 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                 break;
             case CopyOutcomeKind.CardMissing:
                 Show(new MessageScreen("Kortet ble tatt ut.",
-                    "Sett kortet inn igjen, så fortsetter kopieringen der den stoppet. Ingen bilder er borte."));
+                    "Sett kortet inn igjen, så fortsetter kopieringen der den stoppet. Ingen bilder er borte.")
+                { InStep = FlowStep.Copy });
                 break;
             case CopyOutcomeKind.DiskFull:
                 Show(new MessageScreen("Det er ikke nok plass på datamaskinen.",
                     $"Bildene trenger omtrent {Gigabytes(outcome.BytesNeeded)} GB, men det er bare {Gigabytes(outcome.BytesAvailable)} GB ledig. " +
                     "Frigjør plass, og trykk så «Prøv igjen». Ingenting er slettet fra kortet.",
-                    "Prøv igjen", () => RunGuardedAsync(() => CopyAsync(session))));
+                    "Prøv igjen", () => RunGuardedAsync(() => CopyAsync(session)))
+                { Tone = MessageTone.Problem, InStep = FlowStep.Copy });
                 break;
             case CopyOutcomeKind.Cancelled:
                 Show(Idle());
@@ -179,7 +183,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     /// <summary>After copying: group into visits (first time only) and let the user review.</summary>
     private async Task ShowCopiedAsync(Session session)
     {
-        Show(Working("Ordner bildene…"));
+        Show(Working("Ordner bildene…", step: FlowStep.Review));
         await Task.Run(() => _review.Prepare(session.Id));
 
         Func<Task> save = () => RunGuardedAsync(() => SaveAsync(session));
@@ -207,7 +211,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private async Task SaveAsync(Session session)
     {
         _recognition.Stop();
-        var screen = Working("Lagrer bildene…");
+        var screen = Working("Lagrer bildene…", step: FlowStep.Naming);
         screen.IsIndeterminate = false;
         Show(screen);
         var progress = new Progress<SaveProgress>(p =>
@@ -243,7 +247,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private async Task EraseAsync(Session session)
     {
         var count = _eraser.Evaluate(session.Id).Count;
-        var screen = Working("Sletter bildene fra kortet…");
+        var screen = Working("Sletter bildene fra kortet…", step: FlowStep.Erase);
         screen.IsIndeterminate = false;
         Show(screen);
 
@@ -256,11 +260,14 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         Show(outcome.Kind switch
         {
             EraseOutcomeKind.Completed => new MessageScreen("Kortet er klart for neste tur.",
-                "Alle bildene er trygt lagret på datamaskinen. Du kan ta ut kortet."),
+                "Alle bildene er trygt lagret på datamaskinen. Du kan ta ut kortet.")
+            { Tone = MessageTone.Success, InStep = FlowStep.AllDone },
             EraseOutcomeKind.CardMissing => new MessageScreen("Kortet ble tatt ut.",
-                "Sett kortet inn igjen for å slette resten av bildene. Alle bildene er trygt lagret."),
+                "Sett kortet inn igjen for å slette resten av bildene. Alle bildene er trygt lagret.")
+            { InStep = FlowStep.Erase },
             _ => new MessageScreen("Kortet ble ikke slettet helt.",
-                (outcome.Reason ?? "Noe gikk galt.") + " Bildene som er igjen på kortet, blir ikke rørt."),
+                (outcome.Reason ?? "Noe gikk galt.") + " Bildene som er igjen på kortet, blir ikke rørt.")
+            { Tone = MessageTone.Problem, InStep = FlowStep.Erase },
         });
     }
 
@@ -296,7 +303,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         {
             Log.Error(ex, "Step failed");
             Show(new MessageScreen("Noe gikk galt.",
-                "Ingen bilder er slettet. Ta ut kortet og sett det inn igjen for å prøve på nytt.\n\n" + ex.Message));
+                "Ingen bilder er slettet. Ta ut kortet og sett det inn igjen for å prøve på nytt.\n\n" + ex.Message)
+            { Tone = MessageTone.Problem });
         }
         finally
         {
@@ -306,7 +314,12 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     private void Show(Screen screen) => Screen = screen;
 
-    private static WorkingScreen Working(string title, string detail = "") => new() { Title = title, Detail = detail };
+    /// <summary>Kopier · Gå gjennom · Navn og tagger · Tøm kortet, with the current one marked.</summary>
+    public IReadOnlyList<FlowStep> Steps => FlowStep.For(Screen.Step);
+    public bool HasSteps => Screen.Step > 0;
+
+    private static WorkingScreen Working(string title, string detail = "", int step = 0) =>
+        new() { Title = title, Detail = detail, InStep = step };
 
     private IdleScreen Idle() => new(ChooseFolderAsync, ShowImports);
 

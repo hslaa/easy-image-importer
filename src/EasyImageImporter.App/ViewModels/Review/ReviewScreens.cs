@@ -48,42 +48,69 @@ internal static class Rows
 /// <summary>All visits on the card. "Default is keep everything": the user actively sorts away.</summary>
 public sealed partial class ReviewScreen(
     ReviewOverview overview, IReadOnlyList<object> rows, IReadOnlyList<FilterChip> filters, string? filterText,
-    AnimalRecognition recognition, string? alreadyImportedText, string? failedText, Action next, Func<Task> retryFailed) : Screen
+    AnimalRecognition recognition, string? alreadyImportedText, string? failedText, Action next, Func<Task> retryFailed,
+    Action? discardShown = null) : Screen
 {
+    private ReviewOverview _overview = overview;
+
+    public override int Step => FlowStep.Review;
+
     /// <summary>A <see cref="PlaceHeader"/> followed by that place's <see cref="VisitRow"/>s, place by place.</summary>
     public IReadOnlyList<object> Rows { get; } = rows;
 
-    /// <summary>Alle · Ravn (5) · Kråkefugl (3) · Tomme (12) · Usikre (4). Empty until there is something to filter on.</summary>
+    /// <summary>Alle · Tomme (12) · Usikre (4) · Ravn (5) … Empty until there is something to filter on.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasFilters))]
     private IReadOnlyList<FilterChip> _filters = filters;
 
     public bool HasFilters => Filters.Count > 1;
 
-    public void FiltersChanged(IReadOnlyList<FilterChip> filters) => Filters = filters;
+    /// <summary>A choice was made on a card: new counts, but the list itself stays where it is.</summary>
+    public void Changed(ReviewOverview overview, IReadOnlyList<FilterChip> filters, int shownToDiscard)
+    {
+        _overview = overview;
+        Filters = filters;
+        _shownToDiscard = shownToDiscard;
+        OnPropertyChanged(nameof(Summary));
+        OnPropertyChanged(nameof(DiscardShownText));
+        OnPropertyChanged(nameof(CanDiscardShown));
+    }
 
     /// <summary>"Viser 12 av 60 hendelser" while a filter is on.</summary>
     public string? FilterText { get; } = filterText;
 
     public AnimalRecognition Recognition { get; } = recognition;
 
-    public string Summary { get; } =
-        $"{Review.Rows.Count(overview.ImageCount)} i {overview.Visits.Count:N0} " +
-        $"{(overview.Visits.Count == 1 ? "hendelse" : "hendelser")}" +
-        (overview.Places.Count > 1 ? $" på {overview.Places.Count:N0} steder. " : ". ") +
-        (overview.KeptCount == overview.ImageCount
-            ? "Alle blir lagret."
-            : $"{Review.Rows.Count(overview.KeptCount)} blir lagret, {overview.ImageCount - overview.KeptCount:N0} sorteres bort.");
+    public string Summary =>
+        $"{Review.Rows.Count(_overview.ImageCount)} i {_overview.Visits.Count:N0} " +
+        $"{(_overview.Visits.Count == 1 ? "hendelse" : "hendelser")}" +
+        (_overview.Places.Count > 1 ? $" på {_overview.Places.Count:N0} steder." : ".") +
+        (_overview.KeptCount == _overview.ImageCount ? ""
+            : $" {_overview.ImageCount - _overview.KeptCount:N0} av dem sorteres bort.");
 
-    public string? VideosText { get; } = overview.Videos.Count switch
+    /// <summary>Things worth knowing, but nothing to do: skipped duplicates and videos.</summary>
+    public string? NoteText { get; } = string.Join(" ", new[]
     {
-        0 => null,
-        1 => "1 video blir lagret uten gjennomgang.",
-        var n => $"{n:N0} videoer blir lagret uten gjennomgang.",
-    };
+        alreadyImportedText,
+        overview.Videos.Count switch
+        {
+            0 => null,
+            1 => "1 video blir lagret uten gjennomgang.",
+            var n => $"{n:N0} videoer blir lagret uten gjennomgang.",
+        },
+    }.Where(t => t is not null)) is { Length: > 0 } text ? text : null;
 
-    public string? AlreadyImportedText { get; } = alreadyImportedText;
     public string? FailedText { get; } = failedText;
+
+    /// <summary>With "Tomme" chosen: sort away every visit shown, in one go (still the user's choice).</summary>
+    private int _shownToDiscard;
+    public bool CanDiscardShown => discardShown is not null && _shownToDiscard > 0;
+    public string DiscardShownText => _shownToDiscard == 1
+        ? "Sorter bort den tomme hendelsen"
+        : $"Sorter bort alle {_shownToDiscard:N0} tomme hendelser";
+
+    [RelayCommand]
+    private void DiscardShown() => discardShown?.Invoke();
 
     /// <summary>On to naming the places; saving happens from there.</summary>
     [RelayCommand]
@@ -114,28 +141,30 @@ public sealed partial class VisitCard(
 
     public long VisitId => _visit.Id;
     public LazyThumbnail Cover { get; } = cover;
-    public string Title => _visit.Label is { } label
-        ? $"{number}. {label} · {Rows.TimeSpanText(_visit.Start, _visit.End)}"
-        : $"{number}. {Rows.TimeSpanText(_visit.Start, _visit.End)}";
-    public string Details => $"{Rows.DateText(_visit.Start)} · {Rows.Count(_visit.Frames.Count)}";
 
-    public string KeepText =>
-        _visit.KeptCount == _visit.Frames.Count ? "Alle beholdes"
-        : _visit.KeptCount == 0 ? "Sorteres bort"
-        : $"{_visit.KeptCount:N0} av {_visit.Frames.Count:N0} beholdes";
+    /// <summary>What's in it once the user has said so, otherwise just its number.</summary>
+    public string Title => _visit.Label ?? $"Hendelse {number}";
+    public string Details =>
+        $"{Rows.DateText(_visit.Start)} kl. {Rows.TimeSpanText(_visit.Start, _visit.End)} · {Rows.Count(_visit.Frames.Count)}";
 
     public bool IsDiscarded => _visit.KeptCount == 0;
-    public string ToggleText => IsDiscarded ? "Behold" : "Sorter bort";
+    private bool IsAllKept => _visit.KeptCount == _visit.Frames.Count;
+
+    /// <summary>Checked: all kept. Unchecked: sorted away. In between: some of the frames.</summary>
+    public bool? KeepState => IsAllKept ? true : IsDiscarded ? false : null;
+    public string KeepLabel => IsAllKept || IsDiscarded ? "Behold" : $"Behold ({_visit.KeptCount:N0} av {_visit.Frames.Count:N0})";
 
     /// <summary>Looks empty: shown a bit faded, but never hidden or sorted away on its own.</summary>
     public bool LooksEmpty => _visit.Suggestion?.Kind == SuggestionKind.Empty
                               && _visit.SuggestionState != SuggestionState.Dismissed && _visit.Label is null;
-    public double Opacity => IsDiscarded ? 0.45 : LooksEmpty ? 0.7 : 1;
+    public double Opacity => IsDiscarded ? 0.4 : LooksEmpty ? 0.7 : 1;
 
     public bool HasQuestion => _visit.HasOpenSuggestion && _visit.Suggestion!.Kind != SuggestionKind.Empty;
     public string Question => _visit.Suggestion is { } s
-        ? $"{s.Name}? {(s.Kind == SuggestionKind.Unsure ? "(usikker)" : $"{s.Score:P0}")}"
+        ? s.Kind == SuggestionKind.Unsure ? $"Kanskje {Lower(s.Name)}?" : $"Er det {Lower(s.Name)}?"
         : "";
+
+    private static string Lower(string name) => name.Length == 0 ? name : char.ToLowerInvariant(name[0]) + name[1..];
 
     public void Update(Visit visit)
     {
@@ -146,8 +175,9 @@ public sealed partial class VisitCard(
     [RelayCommand]
     private void Open() => open(_visit);
 
+    /// <summary>Like a checkbox: partly kept or sorted away becomes all kept, all kept becomes sorted away.</summary>
     [RelayCommand]
-    private void Toggle() => setKeep(_visit, IsDiscarded);
+    private void Toggle() => setKeep(_visit, !IsAllKept);
 
     [RelayCommand]
     private void Accept() => accept(_visit);
@@ -159,6 +189,8 @@ public sealed partial class VisitCard(
 /// <summary>One visit: every frame, keep or sort away one by one, split and merge.</summary>
 public sealed partial class VisitScreen : Screen
 {
+    public override int Step => FlowStep.Review;
+
     private readonly Visit _visit;
     private readonly ReviewService _review;
     private readonly Action<Visit, long> _split;
@@ -175,9 +207,9 @@ public sealed partial class VisitScreen : Screen
         SuggestionText = visit.HasOpenSuggestion && visit.Suggestion is { } s
             ? s.Kind switch
             {
-                SuggestionKind.Empty => "Forslag: ser tom ut.",
-                SuggestionKind.Unsure => $"Forslag: {s.Name}? (usikker)",
-                _ => $"Forslag: {s.Name} ({s.Score:P0})",
+                SuggestionKind.Empty => "Bildene ser tomme ut.",
+                SuggestionKind.Unsure => $"Forslag: kanskje {s.Name.ToLowerInvariant()}",
+                _ => $"Forslag: {s.Name.ToLowerInvariant()}",
             }
             : null;
         CanUseSuggestion = visit.HasOpenSuggestion && visit.Suggestion?.Kind != SuggestionKind.Empty;
@@ -186,6 +218,8 @@ public sealed partial class VisitScreen : Screen
         Title = $"Hendelse {number} av {total}";
         Details = $"{placeName} · {Review.Rows.DateText(visit.Start)} · {Review.Rows.TimeSpanText(visit.Start, visit.End)} · {Review.Rows.Count(visit.Frames.Count)}";
         StartNewPlaceCommand = new RelayCommand(() => startNewPlace?.Invoke(), () => startNewPlace is not null);
+        CanStartNewPlace = startNewPlace is not null;
+        CanMergeWithNext = mergeWithNext is not null;
         BackCommand = new RelayCommand(back);
         PreviousCommand = new RelayCommand(() => previous?.Invoke(), () => previous is not null);
         NextCommand = new RelayCommand(() => next?.Invoke(), () => next is not null);
@@ -226,6 +260,8 @@ public sealed partial class VisitScreen : Screen
     public IRelayCommand NextCommand { get; }
     public IRelayCommand MergeWithNextCommand { get; }
     public IRelayCommand StartNewPlaceCommand { get; }
+    public bool CanStartNewPlace { get; }
+    public bool CanMergeWithNext { get; }
 
     [RelayCommand]
     private void KeepAll() => SetAll(true);
@@ -243,7 +279,8 @@ public sealed partial class VisitScreen : Screen
     private void UpdateKeptText()
     {
         var kept = Tiles.Count(t => t.Keep);
-        KeptText = kept == Tiles.Count ? "Alle beholdes." : kept == 0 ? "Alle sorteres bort." : $"{kept:N0} av {Tiles.Count:N0} beholdes.";
+        KeptText = kept == Tiles.Count ? $"Alle {Tiles.Count:N0} bildene beholdes." : kept == 0 ? "Alle bildene sorteres bort."
+            : $"{kept:N0} av {Tiles.Count:N0} bilder beholdes.";
     }
 
     public void OpenViewer(FrameTile tile)
@@ -289,16 +326,24 @@ public sealed partial class FrameTile : ObservableObject
     internal event Action? Changed;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(KeepText), nameof(Opacity))]
+    [NotifyPropertyChangedFor(nameof(Opacity))]
     private bool _keep;
 
-    public string KeepText => Keep ? "✓ Beholdes" : "Sorteres bort";
     public double Opacity => Keep ? 1 : 0.4;
 
     [RelayCommand]
-    public void ToggleKeep()
+    public void ToggleKeep() => SetKeep(!Keep);
+
+    [RelayCommand]
+    private void MarkKeep() => SetKeep(true);
+
+    [RelayCommand]
+    private void MarkDiscard() => SetKeep(false);
+
+    private void SetKeep(bool keep)
     {
-        Keep = !Keep;
+        if (Keep == keep) return;
+        Keep = keep;
         _review.SetKeep(File.Id, Keep);
         Changed?.Invoke();
     }

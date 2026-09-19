@@ -13,6 +13,8 @@ namespace EasyImageImporter.App.ViewModels.Review;
 /// </summary>
 public sealed partial class NamingScreen : Screen
 {
+    public override int Step => FlowStep.Naming;
+
     private readonly Func<Task> _save;
 
     public NamingScreen(IReadOnlyList<PlaceForm> places, Action back, Func<Task> save)
@@ -67,7 +69,7 @@ public sealed partial class PlaceForm : ObservableObject
         RecognisedText = place.Details.RecognisedName is { } known ? $"Dette ser ut som {known}." : null;
         AnimalsText = place.Animals.Count > 0
             ? string.Join(", ", place.Animals)
-            : "Ingen dyr er merket. Du kan skrive hva som er på bildene i hver hendelse.";
+            : "Ingen dyr er merket ennå. Skriv hva som er på bildene i hver hendelse, eller svar «Ja» på forslagene.";
         TagSuggestions = tagSuggestions;
         Tags = new ObservableCollection<TagChip>(place.Details.Tags.Select(t => new TagChip(t, RemoveTag)));
         _title = place.Details.Title ?? "";

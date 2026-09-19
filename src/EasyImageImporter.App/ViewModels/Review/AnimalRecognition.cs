@@ -35,17 +35,23 @@ public sealed partial class AnimalRecognition : ObservableObject, IDisposable
     public event Action<long>? VisitAnalysed;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsOffered), nameof(IsBusy), nameof(IsFailed), nameof(IsVisible))]
+    [NotifyPropertyChangedFor(nameof(IsOffered), nameof(IsBusy), nameof(IsFailed), nameof(IsVisible), nameof(HasNote))]
     private RecognitionStatus _status;
 
     [ObservableProperty] private double _progress;
-    [ObservableProperty] private string _text = "";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasNote))]
+    private string _text = "";
 
     public string DownloadSize => $"{ModelStore.TotalBytes / 1_000_000:N0} MB";
     public bool IsOffered => Status == RecognitionStatus.NotInstalled;
     public bool IsBusy => Status is RecognitionStatus.Downloading or RecognitionStatus.Analysing;
     public bool IsFailed => Status == RecognitionStatus.DownloadFailed;
-    public bool IsVisible => Status != RecognitionStatus.Done || Text.Length > 0;
+    /// <summary>The panel: offering the download, or at work.</summary>
+    public bool IsVisible => Status != RecognitionStatus.Done;
+    /// <summary>Finished, with a word about it ("Alle hendelsene er sjekket").</summary>
+    public bool HasNote => Status == RecognitionStatus.Done && Text.Length > 0;
 
     [RelayCommand]
     private async Task Download()
@@ -112,7 +118,7 @@ public sealed partial class AnimalRecognition : ObservableObject, IDisposable
             {
                 if (ct.IsCancellationRequested) return;
                 Status = RecognitionStatus.Done;
-                Text = "Alle hendelsene er sjekket.";
+                Text = "Alle hendelsene er sjekket for dyr. Forslagene er bare forslag – du bestemmer.";
             });
         }
         catch (OperationCanceledException)

@@ -54,24 +54,41 @@ public sealed class ReviewFlow
             _ => v.Suggestion.Name,
         };
 
-    private void OnVisitAnalysed(long visitId)
+    private void OnVisitAnalysed(long visitId) => Refresh();
+
+    /// <summary>
+    /// After a choice or an analysis result: update the cards on screen and the counts in place.
+    /// The list itself stays put, so the user keeps their place while scrolling.
+    /// </summary>
+    private void Refresh()
     {
-        if (!_cards.TryGetValue(visitId, out var card)) return;
+        if (_overview is null) return;
         var overview = review.GetOverview(sessionId);
-        if (overview.Visits.FirstOrDefault(v => v.Id == visitId) is { } visit) card.Update(visit);
-        // New chip counts, but the list itself stays put while the user scrolls.
-        _overview?.FiltersChanged(Filters(overview));
+        foreach (var visit in overview.Visits)
+            if (_cards.TryGetValue(visit.Id, out var card)) card.Update(visit);
+        _overview.Changed(overview, Filters(overview), EmptyToDiscard(overview).Count);
+    }
+
+    /// <summary>With "Tomme" chosen: the empty-looking visits on screen that are still kept.</summary>
+    private List<Visit> EmptyToDiscard(ReviewOverview overview) => _filter != EmptyFilter ? []
+        : overview.Visits.Where(v => _cards.ContainsKey(v.Id) && v.KeptCount > 0).ToList();
+
+    private void DiscardShown()
+    {
+        foreach (var visit in EmptyToDiscard(review.GetOverview(sessionId))) review.SetKeep(visit, false);
+        Refresh();
     }
 
     private IReadOnlyList<FilterChip> Filters(ReviewOverview overview)
     {
         var groups = overview.Visits.Select(FilterOf).Where(f => f is not null).GroupBy(f => f!).ToList();
         if (groups.Count == 0) return [];
+        // The ones to deal with first (empty, unsure), then the animals, most common first.
         var named = groups.Where(g => g.Key is not (EmptyFilter or UnsureFilter)).OrderByDescending(g => g.Count()).ThenBy(g => g.Key);
         var chips = new List<FilterChip> { Chip(AllFilter, overview.Visits.Count) };
-        chips.AddRange(named.Select(g => Chip(g.Key, g.Count())));
-        foreach (var special in new[] { UnsureFilter, EmptyFilter })
+        foreach (var special in new[] { EmptyFilter, UnsureFilter })
             if (groups.FirstOrDefault(g => g.Key == special) is { } g) chips.Add(Chip(special, g.Count()));
+        chips.AddRange(named.Select(g => Chip(g.Key, g.Count())));
         return chips;
 
         FilterChip Chip(string key, int count) => new($"{key} ({count:N0})", key == _filter, () =>
@@ -124,21 +141,23 @@ public sealed class ReviewFlow
                 : $"{counts.Duplicate:N0} av bildene var importert fra før og blir hoppet over.",
             failedText: counts.Failed == 0 ? null
                 : $"{counts.Failed:N0} {(counts.Failed == 1 ? "bilde" : "bilder")} kunne ikke kopieres trygt. Kortet vil ikke bli slettet før dette er løst.",
-            ShowNaming, retryFailed);
+            ShowNaming, retryFailed,
+            discardShown: _filter == EmptyFilter ? DiscardShown : null);
         _overview = screen;
+        screen.Changed(overview, filters, EmptyToDiscard(overview).Count);
         show(screen);
     }
 
     private void Accept(Visit visit)
     {
         review.AcceptSuggestion(visit);
-        OnVisitAnalysed(visit.Id);
+        Refresh();
     }
 
     private void Dismiss(Visit visit)
     {
         review.DismissSuggestion(visit);
-        OnVisitAnalysed(visit.Id);
+        Refresh();
     }
 
     /// <summary>"Navn og tagger": name each place before saving.</summary>
@@ -155,7 +174,7 @@ public sealed class ReviewFlow
     private void SetVisitKeep(Visit visit, bool keep)
     {
         review.SetKeep(visit, keep);
-        ShowOverview();
+        Refresh();
     }
 
     private void OpenVisit(Visit visit) => OpenVisit(visit.Id);

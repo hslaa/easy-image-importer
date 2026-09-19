@@ -13,98 +13,175 @@
         <KeyBinding Gesture="Escape" Command="{Binding Viewer.CloseCommand}" />
     </UserControl.KeyBindings>
 
+    <UserControl.Styles>
+        <!-- Behold | Sorter bort in the large view: the chosen one is lit. -->
+        <Style Selector="Button.dark.selected">
+            <Setter Property="Background" Value="{StaticResource ViewerTextBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource ViewerTextBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="Button.dark.selected Path.icon">
+            <Setter Property="Stroke" Value="{StaticResource TextBrush}" />
+        </Style>
+        <Style Selector="Button.dark.selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="White" />
+            <Setter Property="BorderBrush" Value="White" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+        </Style>
+    </UserControl.Styles>
+
     <Panel>
-        <DockPanel Margin="32,28">
-            <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto">
-                <Button Content="← Oversikt" Command="{Binding BackCommand}" VerticalAlignment="Top" />
-                <StackPanel Grid.Column="1" Spacing="4" Margin="20,0">
+        <DockPanel>
+            <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" Margin="32,20,32,14">
+                <Button Command="{Binding BackCommand}" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Path Classes="icon" Data="{StaticResource IconBack}" />
+                        <TextBlock Text="Oversikten" />
+                    </StackPanel>
+                </Button>
+                <StackPanel Grid.Column="1" Spacing="2" Margin="20,0" VerticalAlignment="Center">
                     <TextBlock Classes="title" Text="{Binding Title}" />
                     <TextBlock Classes="muted" Text="{Binding Details}" />
                 </StackPanel>
-                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
-                    <Button Content="Forrige" Command="{Binding PreviousCommand}" />
-                    <Button Content="Neste" Command="{Binding NextCommand}" />
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <Button Command="{Binding PreviousCommand}" ToolTip.Tip="Forrige hendelse">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Path Classes="icon" Data="{StaticResource IconBack}" />
+                            <TextBlock Text="Forrige" />
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding NextCommand}" ToolTip.Tip="Neste hendelse">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Neste" />
+                            <Path Classes="icon" Data="{StaticResource IconForward}" />
+                        </StackPanel>
+                    </Button>
                 </StackPanel>
             </Grid>
+            <Border DockPanel.Dock="Top" Height="1" Background="{StaticResource LineBrush}" />
 
-            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="12" Margin="0,16,0,0">
-                <TextBlock Text="Hva er på bildene?" VerticalAlignment="Center" />
-                <AutoCompleteBox Text="{Binding Label, UpdateSourceTrigger=LostFocus}" ItemsSource="{Binding AnimalSuggestions}"
-                                 FilterMode="StartsWith" MinimumPrefixLength="1" Width="260" FontSize="18"
-                                 PlaceholderText="F.eks. Kongeørn (valgfritt)" />
-                <TextBlock Classes="muted" Text="{Binding SuggestionText}" VerticalAlignment="Center"
-                           IsVisible="{Binding SuggestionText, Converter={x:Static ObjectConverters.IsNotNull}}" />
-                <Button Classes="link" Content="Bruk forslaget" Command="{Binding UseSuggestionCommand}"
-                        IsVisible="{Binding CanUseSuggestion}" />
-            </StackPanel>
+            <ScrollViewer>
+                <StackPanel Margin="32,18,20,24" Spacing="16">
+                    <!-- What's in the pictures: typed, or taken from the suggestion. -->
+                    <Border Classes="card" Padding="20,14">
+                        <WrapPanel>
+                            <TextBlock Classes="strong" Text="Hva er på bildene?" VerticalAlignment="Center" Margin="0,4,14,4" />
+                            <AutoCompleteBox Text="{Binding Label, UpdateSourceTrigger=LostFocus}" ItemsSource="{Binding AnimalSuggestions}"
+                                             FilterMode="StartsWith" MinimumPrefixLength="1" Width="280"
+                                             PlaceholderText="F.eks. kongeørn (valgfritt)" Margin="0,4,18,4" />
+                            <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,4"
+                                        IsVisible="{Binding SuggestionText, Converter={x:Static ObjectConverters.IsNotNull}}">
+                                <Path Classes="icon" Data="{StaticResource IconSparkle}" Stroke="{StaticResource AccentBrush}" />
+                                <TextBlock Classes="muted" Text="{Binding SuggestionText}" VerticalAlignment="Center" />
+                                <Button Classes="compact" Content="Bruk forslaget" Command="{Binding UseSuggestionCommand}"
+                                        IsVisible="{Binding CanUseSuggestion}" />
+                            </StackPanel>
+                        </WrapPanel>
+                    </Border>
 
-            <WrapPanel DockPanel.Dock="Top" Margin="0,12,0,0">
-                <TextBlock Text="{Binding KeptText}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,20,8" />
-                <Button Content="Behold alle" Command="{Binding KeepAllCommand}" Margin="0,0,8,8" />
-                <Button Content="Sorter bort alle" Command="{Binding DiscardAllCommand}" Margin="0,0,8,8" />
-                <Button Classes="link" Content="Slå sammen med neste hendelse" Command="{Binding MergeWithNextCommand}"
-                        Margin="0,0,8,8" />
-                <Button Classes="link" Content="Nytt sted fra denne hendelsen" Command="{Binding StartNewPlaceCommand}"
-                        Margin="0,0,8,8" />
-            </WrapPanel>
+                    <WrapPanel>
+                        <TextBlock Classes="strong" Text="{Binding KeptText}" VerticalAlignment="Center" Margin="0,0,20,8" />
+                        <Button Content="Behold alle" Command="{Binding KeepAllCommand}" Margin="0,0,8,8" />
+                        <Button Content="Sorter bort alle" Command="{Binding DiscardAllCommand}" Margin="0,0,8,8" />
+                    </WrapPanel>
 
-            <ScrollViewer Margin="0,8,0,0">
-                <ItemsControl ItemsSource="{Binding Rows}">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <VirtualizingStackPanel />
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate DataType="review:FrameRow">
-                            <ItemsControl ItemsSource="{Binding Items}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <UniformGrid Columns="4" />
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate DataType="review:FrameTile">
-                                        <Border Background="White" CornerRadius="8" Margin="0,0,10,10" ClipToBounds="True">
-                                            <StackPanel>
-                                                <Button Classes="image" Command="{Binding OpenCommand}" Opacity="{Binding Opacity}">
-                                                    <Panel Height="150" Background="#DDD8CC">
-                                                        <Image Source="{Binding Thumbnail.Image}" Stretch="UniformToFill" />
-                                                    </Panel>
-                                                </Button>
-                                                <Grid ColumnDefinitions="*,Auto" Margin="10,4,6,4">
-                                                    <TextBlock Classes="muted" FontSize="14" Text="{Binding TimeText}"
-                                                               VerticalAlignment="Center" />
-                                                    <Button Grid.Column="1" Classes="link" FontSize="14"
-                                                            Content="{Binding KeepText}" Command="{Binding ToggleKeepCommand}" />
-                                                </Grid>
-                                            </StackPanel>
-                                        </Border>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                    <ItemsControl ItemsSource="{Binding Rows}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <VirtualizingStackPanel />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="review:FrameRow">
+                                <ItemsControl ItemsSource="{Binding Items}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <UniformGrid Columns="4" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="review:FrameTile">
+                                            <Border Classes="card" CornerRadius="10" Margin="0,0,12,12" ClipToBounds="True">
+                                                <DockPanel>
+                                                    <Button DockPanel.Dock="Top" Classes="image" Command="{Binding OpenCommand}"
+                                                            ToolTip.Tip="Vis bildet stort">
+                                                        <Panel Height="140" Background="{StaticResource PlaceholderBrush}">
+                                                            <Image Source="{Binding Thumbnail.Image}" Stretch="UniformToFill"
+                                                                   Opacity="{Binding Opacity}" />
+                                                        </Panel>
+                                                    </Button>
+                                                    <Grid ColumnDefinitions="*,Auto" Margin="12,4,8,4">
+                                                        <TextBlock Classes="caption muted" Text="{Binding TimeText}" VerticalAlignment="Center" />
+                                                        <CheckBox Grid.Column="1" Content="Behold" IsChecked="{Binding Keep, Mode=OneWay}"
+                                                                  Command="{Binding ToggleKeepCommand}" />
+                                                    </Grid>
+                                                </DockPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <!-- Rarely needed, so out of the way: fixing how the pictures were grouped. -->
+                    <StackPanel Spacing="4" Margin="0,8,0,0">
+                        <TextBlock Classes="small strong" Text="Er bildene gruppert feil?" />
+                        <TextBlock Classes="small muted"
+                                   Text="For å dele hendelsen i to: åpne bildet der den nye skal begynne, og velg «Del hendelsen her»." />
+                        <WrapPanel Margin="-6,2,0,0">
+                            <Button Classes="link" FontSize="15" Content="Slå sammen med neste hendelse"
+                                    Command="{Binding MergeWithNextCommand}" IsVisible="{Binding CanMergeWithNext}" Margin="0,0,12,0" />
+                            <Button Classes="link" FontSize="15" Content="Flytt til et nytt sted (herfra og ut)"
+                                    Command="{Binding StartNewPlaceCommand}" IsVisible="{Binding CanStartNewPlace}" />
+                        </WrapPanel>
+                    </StackPanel>
+                </StackPanel>
             </ScrollViewer>
         </DockPanel>
 
-        <!-- Large view of one frame. -->
-        <DockPanel Background="#141814" IsVisible="{Binding Viewer, Converter={x:Static ObjectConverters.IsNotNull}}">
-            <Border DockPanel.Dock="Bottom" Background="#F6F4EE" Padding="24,14">
-                <Grid ColumnDefinitions="*,Auto">
-                    <StackPanel Orientation="Horizontal" Spacing="10">
-                        <Button Content="← Forrige" Command="{Binding Viewer.PreviousCommand}" />
-                        <Button Content="Neste →" Command="{Binding Viewer.NextCommand}" />
-                        <Button Classes="primary" Content="{Binding Viewer.Tile.KeepText}" Command="{Binding Viewer.ToggleKeepCommand}"
-                                MinWidth="170" />
-                        <TextBlock Text="{Binding Viewer.Position}" VerticalAlignment="Center" Margin="10,0,0,0" />
+        <!-- Large view of one frame: what it is and the way out at the top, the one decision at the bottom. -->
+        <DockPanel Background="{StaticResource ViewerBrush}" IsVisible="{Binding Viewer, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <Border DockPanel.Dock="Top" Background="{StaticResource ViewerBarBrush}" Padding="24,10">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Classes="strong" Text="{Binding Viewer.Position}" Foreground="{StaticResource ViewerTextBrush}" />
+                        <TextBlock Classes="caption" Text="Piltastene blar · mellomrom velger · Esc lukker" Foreground="#9AA597" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
-                        <Button Classes="link" Content="Del hendelsen her" Command="{Binding Viewer.SplitHereCommand}" />
-                        <Button Content="Lukk" Command="{Binding Viewer.CloseCommand}" />
+                        <Button Classes="dark" Content="Del hendelsen her" Command="{Binding Viewer.SplitHereCommand}"
+                                IsVisible="{Binding Viewer.CanSplit}" ToolTip.Tip="Gjør dette og bildene etter til en ny hendelse" />
+                        <Button Classes="dark" Command="{Binding Viewer.CloseCommand}" ToolTip.Tip="Lukk (Esc)">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Path Classes="icon" Data="{StaticResource IconClose}" />
+                                <TextBlock Text="Lukk" />
+                            </StackPanel>
+                        </Button>
                     </StackPanel>
                 </Grid>
+            </Border>
+            <Border DockPanel.Dock="Bottom" Background="{StaticResource ViewerBarBrush}" Padding="24,12">
+                <StackPanel Orientation="Horizontal" Spacing="16" HorizontalAlignment="Center">
+                    <Button Classes="dark" Command="{Binding Viewer.PreviousCommand}" ToolTip.Tip="Forrige bilde (←)">
+                        <Path Classes="icon" Data="{StaticResource IconBack}" />
+                    </Button>
+                    <StackPanel Orientation="Horizontal">
+                        <Button Classes="dark" CornerRadius="8,0,0,8" MinWidth="140" Command="{Binding Viewer.Tile.MarkKeepCommand}"
+                                Classes.selected="{Binding Viewer.Tile.Keep}" HorizontalContentAlignment="Center">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Path Classes="icon" Data="{StaticResource IconCheck}" />
+                                <TextBlock Text="Behold" />
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="dark" CornerRadius="0,8,8,0" MinWidth="140" Content="Sorter bort"
+                                Command="{Binding Viewer.Tile.MarkDiscardCommand}" HorizontalContentAlignment="Center"
+                                Classes.selected="{Binding !Viewer.Tile.Keep}" />
+                    </StackPanel>
+                    <Button Classes="dark" Command="{Binding Viewer.NextCommand}" ToolTip.Tip="Neste bilde (→)">
+                        <Path Classes="icon" Data="{StaticResource IconForward}" />
+                    </Button>
+                </StackPanel>
             </Border>
             <Image Source="{Binding Viewer.Image}" Stretch="Uniform" Margin="16" Opacity="{Binding Viewer.Tile.Opacity}" />
         </DockPanel>
