@@ -205,16 +205,6 @@ public sealed class ReviewFlow
             back: ShowOverview,
             previous: previous is null ? null : () => OpenVisit(previous.Id),
             next: next is null ? null : () => OpenVisit(next.Id),
-            mergeWithNext: next is null ? null : () =>
-            {
-                review.Merge(visit, next);
-                OpenVisit(visit.Id);
-            },
-            split: (v, firstOfNew) =>
-            {
-                review.Split(v, firstOfNew);
-                OpenVisit(v.Id);
-            },
             startNewPlace: firstAtPlace ? null : () =>
             {
                 review.StartNewPlace(place, visit);

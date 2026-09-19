@@ -125,17 +125,13 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
 
-                    <!-- Rarely needed, so out of the way: fixing how the pictures were grouped. -->
-                    <StackPanel Spacing="4" Margin="0,8,0,0">
-                        <TextBlock Classes="small strong" Text="Er bildene gruppert feil?" />
+                    <!-- Rarely needed, so out of the way. A wrong place matters: it decides the folder. -->
+                    <StackPanel Spacing="4" Margin="0,8,0,0" IsVisible="{Binding CanStartNewPlace}">
+                        <TextBlock Classes="small strong" Text="Er dette feil sted?" />
                         <TextBlock Classes="small muted"
-                                   Text="For å dele bildeserien i to: åpne bildet der den nye skal begynne, og velg «Del bildeserien her»." />
-                        <WrapPanel Margin="-6,2,0,0">
-                            <Button Classes="link" FontSize="15" Content="Slå sammen med neste bildeserie"
-                                    Command="{Binding MergeWithNextCommand}" IsVisible="{Binding CanMergeWithNext}" Margin="0,0,12,0" />
-                            <Button Classes="link" FontSize="15" Content="Flytt til et nytt sted (herfra og ut)"
-                                    Command="{Binding StartNewPlaceCommand}" IsVisible="{Binding CanStartNewPlace}" />
-                        </WrapPanel>
+                                   Text="Hvis kameraet ble flyttet: flytt denne bildeserien, og de som kommer etter, til et nytt sted." />
+                        <Button Classes="link" FontSize="15" Content="Flytt til et nytt sted" Margin="-6,2,0,0"
+                                HorizontalAlignment="Left" Command="{Binding StartNewPlaceCommand}" />
                     </StackPanel>
                 </StackPanel>
             </ScrollViewer>
@@ -150,8 +146,6 @@
                         <TextBlock Classes="caption" Text="Piltastene blar · mellomrom velger · Esc lukker" Foreground="#9AA597" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
-                        <Button Classes="dark" Content="Del bildeserien her" Command="{Binding Viewer.SplitHereCommand}"
-                                IsVisible="{Binding Viewer.CanSplit}" ToolTip.Tip="Gjør dette og bildene etter til en ny bildeserie" />
                         <Button Classes="dark" Command="{Binding Viewer.CloseCommand}" ToolTip.Tip="Lukk (Esc)">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <Path Classes="icon" Data="{StaticResource IconClose}" />

@@ -186,22 +186,19 @@ public sealed partial class VisitCard(
     private void Dismiss() => dismiss(_visit);
 }
 
-/// <summary>One visit: every frame, keep or sort away one by one, split and merge.</summary>
+/// <summary>One visit: every frame, keep or sort away one by one.</summary>
 public sealed partial class VisitScreen : Screen
 {
     public override int Step => FlowStep.Review;
 
     private readonly Visit _visit;
     private readonly ReviewService _review;
-    private readonly Action<Visit, long> _split;
 
     public VisitScreen(Visit visit, int number, int total, string placeName, IReadOnlyList<FrameTile> tiles,
-        ReviewService review, Action back, Action? previous, Action? next, Action? mergeWithNext,
-        Action<Visit, long> split, Action? startNewPlace)
+        ReviewService review, Action back, Action? previous, Action? next, Action? startNewPlace)
     {
         _visit = visit;
         _review = review;
-        _split = split;
         _label = visit.Label ?? "";
         AnimalSuggestions = review.AnimalSuggestions();
         SuggestionText = visit.HasOpenSuggestion && visit.Suggestion is { } s
@@ -219,11 +216,9 @@ public sealed partial class VisitScreen : Screen
         Details = $"{placeName} · {Review.Rows.DateText(visit.Start)} · {Review.Rows.TimeSpanText(visit.Start, visit.End)} · {Review.Rows.Count(visit.Frames.Count)}";
         StartNewPlaceCommand = new RelayCommand(() => startNewPlace?.Invoke(), () => startNewPlace is not null);
         CanStartNewPlace = startNewPlace is not null;
-        CanMergeWithNext = mergeWithNext is not null;
         BackCommand = new RelayCommand(back);
         PreviousCommand = new RelayCommand(() => previous?.Invoke(), () => previous is not null);
         NextCommand = new RelayCommand(() => next?.Invoke(), () => next is not null);
-        MergeWithNextCommand = new RelayCommand(() => mergeWithNext?.Invoke(), () => mergeWithNext is not null);
         foreach (var tile in tiles) tile.Changed += UpdateKeptText;
         UpdateKeptText();
     }
@@ -258,10 +253,8 @@ public sealed partial class VisitScreen : Screen
     public IRelayCommand BackCommand { get; }
     public IRelayCommand PreviousCommand { get; }
     public IRelayCommand NextCommand { get; }
-    public IRelayCommand MergeWithNextCommand { get; }
     public IRelayCommand StartNewPlaceCommand { get; }
     public bool CanStartNewPlace { get; }
-    public bool CanMergeWithNext { get; }
 
     [RelayCommand]
     private void KeepAll() => SetAll(true);
@@ -293,12 +286,6 @@ public sealed partial class VisitScreen : Screen
     {
         Viewer?.Dispose();
         Viewer = null;
-    }
-
-    internal void SplitAt(FrameTile tile)
-    {
-        CloseViewer();
-        _split(_visit, tile.File.Id);
     }
 }
 
@@ -369,15 +356,14 @@ public sealed partial class FrameViewer : ObservableObject, IDisposable
     }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(Tile), nameof(Position), nameof(CanSplit))]
-    [NotifyCanExecuteChangedFor(nameof(PreviousCommand), nameof(NextCommand), nameof(SplitHereCommand))]
+    [NotifyPropertyChangedFor(nameof(Tile), nameof(Position))]
+    [NotifyCanExecuteChangedFor(nameof(PreviousCommand), nameof(NextCommand))]
     private int _index;
 
     [ObservableProperty] private Bitmap? _image;
 
     public FrameTile Tile => _screen.Tiles[Index];
     public string Position => $"Bilde {Index + 1:N0} av {_screen.Tiles.Count:N0} · {Tile.TimeText}";
-    public bool CanSplit => Index > 0;
 
     [RelayCommand(CanExecute = nameof(HasPrevious))]
     private void Previous() => Go(Index - 1);
@@ -390,9 +376,6 @@ public sealed partial class FrameViewer : ObservableObject, IDisposable
 
     [RelayCommand]
     private void ToggleKeep() => Tile.ToggleKeep();
-
-    [RelayCommand(CanExecute = nameof(CanSplit))]
-    private void SplitHere() => _screen.SplitAt(Tile);
 
     [RelayCommand]
     private void Close() => _screen.CloseViewer();
