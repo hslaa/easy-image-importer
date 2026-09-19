@@ -29,6 +29,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private ReviewFlow? _flow;
     private readonly Recovery _recovery;
     private readonly CardWatcher _watcher = new(new SystemDriveProvider());
+    private readonly ICardEjector _ejector = new CardEjector();
+
+    /// <summary>The card is emptied but couldn't be ejected: taking it out counts as done.</summary>
+    private bool _waitingForRemoval;
 
     private bool _busy;
     private Session? _current;
@@ -96,14 +100,23 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         await RunGuardedAsync(async () =>
         {
             Log.Information("Card inserted at {Root}", root);
+            var before = Screen;
             Show(Working("Leser kortet…", step: FlowStep.Copy));
-            AttentionNeeded?.Invoke();
             var session = await Task.Run(() => _scanner.OpenSession(_scanner.Scan(root), label));
             if (session is null)
             {
+                // The card just emptied and ejected, mounted again by Windows: nothing new, stay put.
+                if (_current is { State: SessionState.CardErased } && _current.SourceRoot == root)
+                {
+                    Show(before);
+                    return;
+                }
+                AttentionNeeded?.Invoke();
                 Show(new MessageScreen("Fant ingen bilder på kortet.", "Det er ingen bilder eller videoer på dette kortet."));
                 return;
             }
+
+            AttentionNeeded?.Invoke();
 
             _current = session;
             await ContinueAsync(session);
@@ -112,11 +125,11 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     private void OnCardRemoved(string root)
     {
-        // After the card is emptied, pulling it out returns to the start screen.
-        if (!_busy && _current is { State: SessionState.CardErased } && _current.SourceRoot == root)
+        // Emptied but not ejected, and now taken out anyway: that's the end of this card.
+        if (!_busy && _waitingForRemoval && _current is { State: SessionState.CardErased } && _current.SourceRoot == root)
         {
-            _current = null;
-            Show(Idle());
+            _waitingForRemoval = false;
+            Show(CardReady("Alle bildene er trygt lagret på datamaskinen."));
         }
     }
 
@@ -257,11 +270,14 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             session.Id, outcome.Kind, outcome.Erased, outcome.Reason);
         _current = _store.GetSession(session.Id);
 
+        if (outcome.Kind == EraseOutcomeKind.Completed)
+        {
+            await EjectAsync(session);
+            return;
+        }
+
         Show(outcome.Kind switch
         {
-            EraseOutcomeKind.Completed => new MessageScreen("Kortet er klart for neste tur.",
-                "Alle bildene er trygt lagret på datamaskinen. Du kan ta ut kortet.")
-            { Tone = MessageTone.Success, InStep = FlowStep.AllDone },
             EraseOutcomeKind.CardMissing => new MessageScreen("Kortet ble tatt ut.",
                 "Sett kortet inn igjen for å slette resten av bildene. Alle bildene er trygt lagret.")
             { InStep = FlowStep.Erase },
@@ -270,6 +286,37 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             { Tone = MessageTone.Problem, InStep = FlowStep.Erase },
         });
     }
+
+    /// <summary>"Løs ut": lets the system finish with the emptied card, so pulling it out is safe.</summary>
+    private async Task EjectAsync(Session session)
+    {
+        _waitingForRemoval = false;
+        Show(Working("Løser ut kortet…", step: FlowStep.Erase));
+        var result = await Task.Run(() => _ejector.Eject(session.SourceRoot));
+        Log.Information("Eject of {Root}: {Result}", session.SourceRoot, result);
+        if (result == EjectResult.Ejected)
+        {
+            Show(CardReady("Alle bildene er trygt lagret på datamaskinen. Kortet er løst ut, så du kan ta det ut nå."));
+            return;
+        }
+
+        _waitingForRemoval = true;
+        Show(new MessageScreen("Kortet er tømt, men ikke løst ut.",
+            "Alle bildene er trygt lagret på datamaskinen. " + (result == EjectResult.InUse
+                ? "Noe annet bruker kortet, for eksempel et vindu i Utforsker som viser det. Lukk det, og trykk «Løs ut kortet»."
+                : "Vent litt, og trykk «Løs ut kortet» for å prøve igjen."),
+            "Løs ut kortet", () => RunGuardedAsync(() => EjectAsync(session)))
+        { Tone = MessageTone.Info, InStep = FlowStep.Erase });
+    }
+
+    private MessageScreen CardReady(string body) =>
+        new("Kortet er klart for neste tur.", body, "Ferdig", () =>
+        {
+            _current = null;
+            Show(Idle());
+            return Task.CompletedTask;
+        })
+        { Tone = MessageTone.Success, InStep = FlowStep.AllDone };
 
     /// <summary>Moves an import back to "copied, ready to save". Nothing is deleted.</summary>
     private async Task UndoAsync(long importId)
