@@ -1,6 +1,8 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Avalonia.Threading;
+using Viltkamera.App.Startup;
 using Viltkamera.App.ViewModels;
 using Viltkamera.App.Views;
 
@@ -12,6 +14,9 @@ namespace Viltkamera.App;
 /// </summary>
 public partial class App : Application
 {
+    /// <summary>Set by Program before Avalonia starts.</summary>
+    internal static SingleInstance? SingleInstance { get; set; }
+
     private MainViewModel? _viewModel;
     private MainWindow? _window;
 
@@ -24,8 +29,11 @@ public partial class App : Application
             _viewModel = new MainViewModel();
             _window = new MainWindow { DataContext = _viewModel };
             _viewModel.AttentionNeeded += ShowWindow;
-            desktop.MainWindow = _window;
             desktop.Exit += (_, _) => _viewModel.Dispose();
+            SingleInstance?.Listen(() => Dispatcher.UIThread.Post(ShowWindow));
+
+            // At login we stay in the tray; opened by hand, the window shows right away.
+            if (!Program.StartedInTray) ShowWindow();
             _viewModel.Start();
         }
 

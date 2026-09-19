@@ -1,6 +1,6 @@
-using System.Diagnostics;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Serilog;
 using Viltkamera.Core.Cards;
 using Viltkamera.Core.Import;
 using Viltkamera.Core.IO;
@@ -65,7 +65,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             return;
         }
 
+        // Something was left unfinished: show it, even if we started quietly in the tray.
+        Log.Information("Resuming session {Session} in state {State}", session.Id, session.State);
         _current = session;
+        AttentionNeeded?.Invoke();
         await ContinueAsync(session);
     }
 
@@ -74,6 +77,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         if (_busy) return;
         await RunGuardedAsync(async () =>
         {
+            Log.Information("Card inserted at {Root}", root);
             Show(Working("Leser kortet…"));
             AttentionNeeded?.Invoke();
             var session = await Task.Run(() => _scanner.OpenSession(_scanner.Scan(root), label));
@@ -132,6 +136,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             screen.Progress = p.Total == 0 ? 0 : 100.0 * p.Done / p.Total;
         });
         var outcome = await Task.Run(() => _copier.Run(session.Id, progress));
+        Log.Information("Copy for session {Session}: {Outcome} {@Counts}", session.Id, outcome.Kind, outcome.Counts);
 
         switch (outcome.Kind)
         {
@@ -170,7 +175,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private async Task SaveAsync(Session session)
     {
         Show(Working("Lagrer bildene…"));
-        await Task.Run(() => _finalizer.Run(session.Id));
+        var import = await Task.Run(() => _finalizer.Run(session.Id));
+        Log.Information("Session {Session} saved to {Folder}", session.Id, import?.FolderPath ?? "(nothing new)");
         await ShowDoneAsync(session);
     }
 
@@ -192,6 +198,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
         var progress = new Progress<int>(done => screen.Progress = 100.0 * done / Math.Max(count, 1));
         var outcome = await Task.Run(() => _eraser.Erase(session.Id, progress));
+        Log.Information("Erase for session {Session}: {Outcome}, {Erased} erased, {Reason}",
+            session.Id, outcome.Kind, outcome.Erased, outcome.Reason);
         _current = _store.GetSession(session.Id);
 
         Show(outcome.Kind switch
@@ -215,7 +223,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
         catch (Exception ex)
         {
-            Trace.TraceError(ex.ToString());
+            Log.Error(ex, "Step failed");
             Show(new MessageScreen("Noe gikk galt.",
                 "Ingen bilder er slettet. Ta ut kortet og sett det inn igjen for å prøve på nytt.\n\n" + ex.Message));
         }
