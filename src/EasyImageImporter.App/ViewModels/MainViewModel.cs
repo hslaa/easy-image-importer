@@ -1,4 +1,6 @@
 using Avalonia.Threading;
+using EasyImageImporter.App.ViewModels.Review;
+using EasyImageImporter.Core.Review;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Serilog;
 using EasyImageImporter.Core.Cards;
@@ -20,6 +22,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private readonly Finalizer _finalizer;
     private readonly CardEraser _eraser;
     private readonly ImportUndo _undo;
+    private readonly ReviewService _review;
+    private readonly ThumbnailLoader _thumbnails;
     private readonly Recovery _recovery;
     private readonly CardWatcher _watcher = new(new SystemDriveProvider());
 
@@ -47,6 +51,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _finalizer = new Finalizer(fs, _store, paths);
         _eraser = new CardEraser(fs, _store);
         _undo = new ImportUndo(fs, _store, paths);
+        _review = new ReviewService(_store, paths);
+        _thumbnails = new ThumbnailLoader(new ThumbnailCache(Path.Combine(paths.DataRoot, "thumbs")));
         _recovery = new Recovery(_store, _finalizer, _undo);
         Screen = Idle();
     }
@@ -165,17 +171,29 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
     }
 
-    private Task ShowCopiedAsync(Session session)
+    /// <summary>After copying: group into visits (first time only) and let the user review.</summary>
+    private async Task ShowCopiedAsync(Session session)
     {
+        Show(Working("Ordner bildene…"));
+        await Task.Run(() => _review.Prepare(session.Id));
+
+        Func<Task> save = () => RunGuardedAsync(() => SaveAsync(session));
+        Func<Task> retry = () => RunGuardedAsync(() =>
+        {
+            _store.RetryFailed(session.Id);
+            return CopyAsync(session);
+        });
+        var flow = new ReviewFlow(session.Id, _store, _review, _thumbnails, Show, save, retry);
+        if (flow.HasImages)
+        {
+            flow.ShowOverview();
+            return;
+        }
+
+        // Nothing to look at (only videos, or only images imported before): straight to saving.
         var counts = _store.GetCounts(session.Id);
         Show(new CopiedScreen(_store.GetStagedFiles(session.Id).Count, counts.Duplicate, counts.Failed,
-            save: () => RunGuardedAsync(() => SaveAsync(session)),
-            retry: () => RunGuardedAsync(() =>
-            {
-                _store.RetryFailed(session.Id);
-                return CopyAsync(session);
-            })));
-        return Task.CompletedTask;
+            save, retry));
     }
 
     private async Task SaveAsync(Session session)
@@ -191,7 +209,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         var import = _store.GetImportForSession(session.Id);
         var decision = _eraser.Evaluate(session.Id);
         var canUndo = import is not null && _undo.Evaluate(import.Id).Allowed;
-        Show(new DoneScreen(import?.FolderPath, import?.ImageCount ?? 0, decision.Count, decision.Reason, canUndo,
+        Show(new DoneScreen(import?.FolderPath, import?.ImageCount ?? 0, import?.DiscardedCount ?? 0, decision.Count,
+            decision.Reason, canUndo,
             erase: () => RunGuardedAsync(() => EraseAsync(session)),
             undo: () => RunGuardedAsync(() => UndoAsync(import!.Id))));
         return Task.CompletedTask;
@@ -235,7 +254,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public void ShowImports()
     {
         var rows = _store.GetImports().Select(import => new ImportRow(
-            import.FolderPath, import.CreatedUtc, import.ImageCount,
+            import.FolderPath, import.CreatedUtc, import.ImageCount, import.DiscardedCount,
             folderExists: Directory.Exists(import.FolderPath),
             canUndo: !_busy && _undo.Evaluate(import.Id).Allowed,
             undo: () => _busy ? Task.CompletedTask : RunGuardedAsync(() => UndoAsync(import.Id)))).ToList();

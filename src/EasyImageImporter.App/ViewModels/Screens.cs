@@ -94,9 +94,12 @@ public sealed partial class CopiedScreen(int copied, int alreadyImported, int fa
 
 public sealed partial class DoneScreen : Screen
 {
-    public DoneScreen(string? folder, int savedCount, int eraseCount, string? eraseRefusal, bool canUndo,
+    public DoneScreen(string? folder, int savedCount, int discardedCount, int eraseCount, string? eraseRefusal, bool canUndo,
         Func<Task> erase, Func<Task> undo)
     {
+        DiscardedText = discardedCount == 0 ? null
+            : $"{discardedCount:N0} {(discardedCount == 1 ? "bilde" : "bilder")} er sortert bort. " +
+              $"De ligger i undermappen «{EasyImageImporter.Core.Import.Finalizer.DiscardedFolderName}», og er ikke slettet.";
         Erase = new Confirmation(erase);
         Undo = new Confirmation(undo);
         CanUndo = canUndo;
@@ -109,6 +112,7 @@ public sealed partial class DoneScreen : Screen
     }
 
     public string Title { get; }
+    public string? DiscardedText { get; }
     public string? Folder { get; }
     public bool HasFolder => Folder is not null;
 
@@ -143,12 +147,14 @@ public sealed partial class ImportsScreen(IReadOnlyList<ImportRow> rows, Action 
 
 public sealed partial class ImportRow : ObservableObject
 {
-    public ImportRow(string folder, DateTime createdUtc, int imageCount, bool folderExists, bool canUndo, Func<Task> undo)
+    public ImportRow(string folder, DateTime createdUtc, int imageCount, int discardedCount, bool folderExists, bool canUndo,
+        Func<Task> undo)
     {
         Undo = new Confirmation(undo);
         Folder = folder;
         Name = Path.GetFileName(folder);
-        Details = $"Lagret {createdUtc.ToLocalTime():d. MMMM yyyy 'kl.' HH:mm} · {imageCount:N0} {(imageCount == 1 ? "bilde" : "bilder")}";
+        Details = $"Lagret {createdUtc.ToLocalTime():d. MMMM yyyy 'kl.' HH:mm} · {imageCount:N0} {(imageCount == 1 ? "bilde" : "bilder")}"
+                  + (discardedCount > 0 ? $" · {discardedCount:N0} sortert bort" : "");
         FolderExists = folderExists;
         CanUndo = canUndo;
     }

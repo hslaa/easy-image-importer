@@ -14,6 +14,9 @@ public sealed class Finalizer(IFileSystem fs, ImportStore store, AppPaths paths,
 {
     public const string SummaryFileName = "OM DENNE MAPPEN.txt";
 
+    /// <summary>Where discarded images go: inside the import, so they can always be found again.</summary>
+    public const string DiscardedFolderName = "Sortert bort";
+
     private static readonly CultureInfo Norwegian = CultureInfo.GetCultureInfo("nb-NO");
     private readonly TimeProvider _time = time ?? TimeProvider.System;
     private readonly SafeMover _mover = new(fs);
@@ -65,35 +68,43 @@ public sealed class Finalizer(IFileSystem fs, ImportStore store, AppPaths paths,
         var yearDir = Path.Combine(paths.ArchiveRoot, today.ToString("yyyy", CultureInfo.InvariantCulture));
         var folder = UniquePath(Path.Combine(yearDir, $"{today:yyyy-MM-dd} Import"), fs.DirectoryExists);
 
-        var taken = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var discardedFolder = Path.Combine(folder, DiscardedFolderName);
+        var takenKept = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var takenDiscarded = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var moves = files.Select(f =>
         {
             var from = Path.Combine(paths.StagingDir(session.Id), f.StagingName!);
-            var name = UniqueName(f.FileName, taken);
-            return (f.Id, from, Path.Combine(folder, name));
+            var to = f.Keep
+                ? Path.Combine(folder, UniqueName(f.FileName, takenKept))
+                : Path.Combine(discardedFolder, UniqueName(f.FileName, takenDiscarded));
+            return (f.Id, from, to);
         }).ToList();
 
-        return store.CreateImportPlan(session.Id, folder, moves);
+        return store.CreateImportPlan(session.Id, folder, moves, discardedCount: files.Count(f => !f.Keep));
     }
 
     private void WriteSummary(ImportRecord import, Session session)
     {
         var files = store.GetStagedFiles(session.Id);
-        var first = files.Min(f => f.MtimeUtc).ToLocalTime();
-        var last = files.Max(f => f.MtimeUtc).ToLocalTime();
+        var first = files.Min(f => f.TakenAt ?? f.MtimeUtc.ToLocalTime());
+        var last = files.Max(f => f.TakenAt ?? f.MtimeUtc.ToLocalTime());
         var text = new StringBuilder()
             .AppendLine("Bilder fra viltkamera")
             .AppendLine()
             .AppendLine(string.Create(Norwegian, $"Importert:   {import.CreatedUtc.ToLocalTime():d. MMMM yyyy 'kl.' HH:mm}"))
-            .AppendLine(string.Create(Norwegian, $"Antall:      {files.Count:N0} bilder"))
-            .AppendLine(string.Create(Norwegian, $"Tatt:        {first:d. MMMM yyyy} – {last:d. MMMM yyyy}"))
+            .AppendLine(string.Create(Norwegian, $"Antall:      {import.ImageCount:N0} bilder"))
+            .AppendLine(string.Create(Norwegian, $"Tatt:        {first:d. MMMM yyyy} – {last:d. MMMM yyyy}"));
+        if (import.DiscardedCount > 0)
+            text.AppendLine(string.Create(Norwegian,
+                $"Sortert bort: {import.DiscardedCount:N0} bilder, i mappen «{DiscardedFolderName}». De er ikke slettet."));
+        var contents = text
             .AppendLine()
             .AppendLine("Denne filen er laget av EasyImageImporter, og kan leses uten programmet.")
             .ToString()
             .ReplaceLineEndings("\r\n");
 
         // UTF-8 with BOM so old Notepad shows æøå correctly.
-        fs.WriteAllText(Path.Combine(import.FolderPath, SummaryFileName), text, new UTF8Encoding(true));
+        fs.WriteAllText(Path.Combine(import.FolderPath, SummaryFileName), contents, new UTF8Encoding(true));
     }
 
     internal static string UniquePath(string path, Func<string, bool> exists)

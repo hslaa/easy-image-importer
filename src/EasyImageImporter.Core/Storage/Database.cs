@@ -82,6 +82,26 @@ public sealed class Database
 
         ALTER TABLE import_moves ADD COLUMN undone INTEGER NOT NULL DEFAULT 0;
         """,
+        // 3: review. Files get their capture time, the visit (sequence) they belong to, and a keep
+        // flag. Everything is stored per click, so a review can be resumed days later.
+        """
+        CREATE TABLE sequences(
+            id         INTEGER PRIMARY KEY,
+            session_id INTEGER NOT NULL REFERENCES sessions(id),
+            label      TEXT
+        );
+        CREATE INDEX ix_sequences_session ON sequences(session_id);
+
+        ALTER TABLE session_files ADD COLUMN media_kind TEXT;
+        ALTER TABLE session_files ADD COLUMN taken_at TEXT;          -- camera local time, no zone
+        ALTER TABLE session_files ADD COLUMN taken_at_source TEXT;   -- exif | mtime
+        ALTER TABLE session_files ADD COLUMN camera TEXT;
+        ALTER TABLE session_files ADD COLUMN sequence_id INTEGER REFERENCES sequences(id);
+        ALTER TABLE session_files ADD COLUMN keep INTEGER NOT NULL DEFAULT 1;
+        CREATE INDEX ix_session_files_sequence ON session_files(sequence_id);
+
+        ALTER TABLE imports ADD COLUMN discarded_count INTEGER NOT NULL DEFAULT 0;
+        """,
     ];
 
     private readonly string _connectionString;

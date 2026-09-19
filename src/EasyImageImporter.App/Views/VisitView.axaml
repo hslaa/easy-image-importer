@@ -1,0 +1,99 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:review="using:EasyImageImporter.App.ViewModels.Review"
+             x:Class="EasyImageImporter.App.Views.VisitView"
+             x:DataType="review:VisitScreen"
+             Focusable="True">
+
+    <!-- In the large view: ← → to move, space to keep or sort away, Esc to close. -->
+    <UserControl.KeyBindings>
+        <KeyBinding Gesture="Left" Command="{Binding Viewer.PreviousCommand}" />
+        <KeyBinding Gesture="Right" Command="{Binding Viewer.NextCommand}" />
+        <KeyBinding Gesture="Space" Command="{Binding Viewer.ToggleKeepCommand}" />
+        <KeyBinding Gesture="Escape" Command="{Binding Viewer.CloseCommand}" />
+    </UserControl.KeyBindings>
+
+    <Panel>
+        <DockPanel Margin="32,28">
+            <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto">
+                <Button Content="← Oversikt" Command="{Binding BackCommand}" VerticalAlignment="Top" />
+                <StackPanel Grid.Column="1" Spacing="4" Margin="20,0">
+                    <TextBlock Classes="title" Text="{Binding Title}" />
+                    <TextBlock Classes="muted" Text="{Binding Details}" />
+                </StackPanel>
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
+                    <Button Content="Forrige" Command="{Binding PreviousCommand}" />
+                    <Button Content="Neste" Command="{Binding NextCommand}" />
+                </StackPanel>
+            </Grid>
+
+            <WrapPanel DockPanel.Dock="Top" Margin="0,16,0,0">
+                <TextBlock Text="{Binding KeptText}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,20,8" />
+                <Button Content="Behold alle" Command="{Binding KeepAllCommand}" Margin="0,0,8,8" />
+                <Button Content="Sorter bort alle" Command="{Binding DiscardAllCommand}" Margin="0,0,8,8" />
+                <Button Classes="link" Content="Slå sammen med neste hendelse" Command="{Binding MergeWithNextCommand}"
+                        Margin="0,0,8,8" />
+            </WrapPanel>
+
+            <ScrollViewer Margin="0,8,0,0">
+                <ItemsControl ItemsSource="{Binding Rows}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <VirtualizingStackPanel />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="review:FrameRow">
+                            <ItemsControl ItemsSource="{Binding Items}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <UniformGrid Columns="4" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="review:FrameTile">
+                                        <Border Background="White" CornerRadius="8" Margin="0,0,10,10" ClipToBounds="True">
+                                            <StackPanel>
+                                                <Button Classes="image" Command="{Binding OpenCommand}" Opacity="{Binding Opacity}">
+                                                    <Panel Height="150" Background="#DDD8CC">
+                                                        <Image Source="{Binding Thumbnail.Image}" Stretch="UniformToFill" />
+                                                    </Panel>
+                                                </Button>
+                                                <Grid ColumnDefinitions="*,Auto" Margin="10,4,6,4">
+                                                    <TextBlock Classes="muted" FontSize="14" Text="{Binding TimeText}"
+                                                               VerticalAlignment="Center" />
+                                                    <Button Grid.Column="1" Classes="link" FontSize="14"
+                                                            Content="{Binding KeepText}" Command="{Binding ToggleKeepCommand}" />
+                                                </Grid>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </DockPanel>
+
+        <!-- Large view of one frame. -->
+        <DockPanel Background="#F0141814" IsVisible="{Binding Viewer, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <Border DockPanel.Dock="Bottom" Background="#F6F4EE" Padding="24,14">
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Button Content="← Forrige" Command="{Binding Viewer.PreviousCommand}" />
+                        <Button Content="Neste →" Command="{Binding Viewer.NextCommand}" />
+                        <Button Classes="primary" Content="{Binding Viewer.Tile.KeepText}" Command="{Binding Viewer.ToggleKeepCommand}"
+                                MinWidth="170" />
+                        <TextBlock Text="{Binding Viewer.Position}" VerticalAlignment="Center" Margin="10,0,0,0" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
+                        <Button Classes="link" Content="Del hendelsen her" Command="{Binding Viewer.SplitHereCommand}" />
+                        <Button Content="Lukk" Command="{Binding Viewer.CloseCommand}" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+            <Image Source="{Binding Viewer.Image}" Stretch="Uniform" Margin="16" Opacity="{Binding Viewer.Tile.Opacity}" />
+        </DockPanel>
+    </Panel>
+</UserControl>

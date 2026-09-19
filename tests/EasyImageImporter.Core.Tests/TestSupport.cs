@@ -1,5 +1,6 @@
 using System.Text;
 using EasyImageImporter.Core.Import;
+using EasyImageImporter.Core.Review;
 using EasyImageImporter.Core.IO;
 using EasyImageImporter.Core.Storage;
 
@@ -33,14 +34,31 @@ public sealed class TestEnv : IDisposable
     public Recovery Recovery => new(Store, Finalizer, Undo);
 
     /// <summary>Writes a random "image" to the card and returns its bytes.</summary>
-    public byte[] AddCardFile(string relPath, int size = 50_000)
+    public byte[] AddCardFile(string relPath, int size = 50_000, DateTime? mtimeUtc = null)
     {
         var bytes = new byte[size];
         _random.NextBytes(bytes);
+        return AddCardFile(relPath, bytes, mtimeUtc);
+    }
+
+    public byte[] AddCardFile(string relPath, byte[] bytes, DateTime? mtimeUtc = null)
+    {
         var path = Path.Combine(Card, relPath);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllBytes(path, bytes);
+        if (mtimeUtc is { } t) File.SetLastWriteTimeUtc(path, t);
         return bytes;
+    }
+
+    public ReviewService Review => new(Store, Paths);
+
+    /// <summary>Copies the card and prepares the review, like the app does after inserting a card.</summary>
+    public Session CopyAndPrepare()
+    {
+        var session = OpenSession();
+        Assert.Equal(CopyOutcomeKind.Completed, Copier.Run(session.Id).Kind);
+        Review.Prepare(session.Id);
+        return session;
     }
 
     public void AddCardImages(int count, string folder = "DCIM/100MEDIA")

@@ -7,3 +7,6 @@ obj/
 TestResults/
 /publish/
 /Releases/
+
+# Generated camera-trap test cards (see tools/testdata)
+/testdata/

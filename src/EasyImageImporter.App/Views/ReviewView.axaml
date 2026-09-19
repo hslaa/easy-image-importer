@@ -1,0 +1,75 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:review="using:EasyImageImporter.App.ViewModels.Review"
+             x:Class="EasyImageImporter.App.Views.ReviewView"
+             x:DataType="review:ReviewScreen">
+
+    <DockPanel Margin="32,28">
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto">
+            <StackPanel Spacing="6">
+                <TextBlock Classes="title" Text="Gå gjennom bildene" />
+                <TextBlock Text="{Binding Summary}" />
+            </StackPanel>
+            <Button Grid.Column="1" Classes="primary" Content="Lagre bildene" Command="{Binding SaveCommand}"
+                    VerticalAlignment="Top" />
+        </Grid>
+
+        <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="0,12,0,0">
+            <StackPanel Orientation="Horizontal" Spacing="12"
+                        IsVisible="{Binding FailedText, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <TextBlock Classes="warning" Text="{Binding FailedText}" VerticalAlignment="Center" />
+                <Button Content="Prøv igjen" Command="{Binding RetryCommand}" />
+            </StackPanel>
+            <TextBlock Classes="muted" Text="{Binding AlreadyImportedText}"
+                       IsVisible="{Binding AlreadyImportedText, Converter={x:Static ObjectConverters.IsNotNull}}" />
+            <TextBlock Classes="muted" Text="{Binding VideosText}"
+                       IsVisible="{Binding VideosText, Converter={x:Static ObjectConverters.IsNotNull}}" />
+            <TextBlock Classes="muted"
+                       Text="Alt blir lagret, med mindre du sorterer det bort. Trykk på en hendelse for å se alle bildene i den." />
+        </StackPanel>
+
+        <!-- Rows of three, virtualized: only the rows on screen are created. -->
+        <ScrollViewer Margin="0,16,0,0">
+            <ItemsControl ItemsSource="{Binding Rows}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <VirtualizingStackPanel />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="review:VisitRow">
+                        <ItemsControl ItemsSource="{Binding Items}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <UniformGrid Columns="3" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="review:VisitCard">
+                                    <Border Background="White" CornerRadius="10" Margin="0,0,14,14" ClipToBounds="True">
+                                        <StackPanel>
+                                            <Button Classes="image" Command="{Binding OpenCommand}" Opacity="{Binding Opacity}">
+                                                <Panel Height="190" Background="#DDD8CC">
+                                                    <Image Source="{Binding Cover.Image}" Stretch="UniformToFill" />
+                                                </Panel>
+                                            </Button>
+                                            <StackPanel Spacing="2" Margin="14,10,14,12">
+                                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+                                                <TextBlock Classes="muted" FontSize="15" Text="{Binding Details}" />
+                                                <Grid ColumnDefinitions="*,Auto" Margin="0,6,0,0">
+                                                    <TextBlock FontSize="15" Text="{Binding KeepText}" VerticalAlignment="Center" />
+                                                    <Button Grid.Column="1" Classes="link" FontSize="15"
+                                                            Content="{Binding ToggleText}" Command="{Binding ToggleCommand}" />
+                                                </Grid>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </DockPanel>
+</UserControl>
