@@ -27,7 +27,14 @@
                 </StackPanel>
             </Grid>
 
-            <WrapPanel DockPanel.Dock="Top" Margin="0,16,0,0">
+            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="12" Margin="0,16,0,0">
+                <TextBlock Text="Hva er på bildene?" VerticalAlignment="Center" />
+                <AutoCompleteBox Text="{Binding Label, UpdateSourceTrigger=LostFocus}" ItemsSource="{Binding AnimalSuggestions}"
+                                 FilterMode="StartsWith" MinimumPrefixLength="1" Width="260" FontSize="18"
+                                 PlaceholderText="F.eks. Kongeørn (valgfritt)" />
+            </StackPanel>
+
+            <WrapPanel DockPanel.Dock="Top" Margin="0,12,0,0">
                 <TextBlock Text="{Binding KeptText}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,20,8" />
                 <Button Content="Behold alle" Command="{Binding KeepAllCommand}" Margin="0,0,8,8" />
                 <Button Content="Sorter bort alle" Command="{Binding DiscardAllCommand}" Margin="0,0,8,8" />

@@ -40,7 +40,17 @@ public sealed class ReviewFlow(
                 : $"{counts.Duplicate:N0} av bildene var importert fra før og blir hoppet over.",
             failedText: counts.Failed == 0 ? null
                 : $"{counts.Failed:N0} {(counts.Failed == 1 ? "bilde" : "bilder")} kunne ikke kopieres trygt. Kortet vil ikke bli slettet før dette er løst.",
-            save, retryFailed));
+            ShowNaming, retryFailed));
+    }
+
+    /// <summary>"Navn og tagger": name each place before saving.</summary>
+    public void ShowNaming()
+    {
+        var overview = review.GetOverview(sessionId);
+        var tags = review.TagSuggestions();
+        var forms = overview.Places.Select((place, i) => new PlaceForm(place, i + 1,
+            ReviewService.SampleFrames(place.Visits, 4).Select(v => Thumb(v.Cover)).ToList(), store, tags)).ToList();
+        show(new NamingScreen(forms, back: ShowOverview, save));
     }
 
     private void SetVisitKeep(Visit visit, bool keep)

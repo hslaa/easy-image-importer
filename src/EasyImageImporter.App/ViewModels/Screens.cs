@@ -92,10 +92,24 @@ public sealed partial class CopiedScreen(int copied, int alreadyImported, int fa
     private Task Retry() => retry();
 }
 
+/// <summary>One saved folder, with a button that opens it in Explorer.</summary>
+public sealed partial class FolderLink(string path, int imageCount, int discardedCount)
+{
+    public string Path { get; } = path;
+    public string Name { get; } = System.IO.Path.GetFileName(path);
+    public string CountText { get; } = $"{imageCount:N0} {(imageCount == 1 ? "bilde" : "bilder")}" +
+                                       (discardedCount > 0 ? $", {discardedCount:N0} sortert bort" : "");
+    public bool Exists { get; } = Directory.Exists(path);
+    public bool Missing => !Exists;
+
+    [RelayCommand]
+    private void Open() => Platform.OpenFolder(Path);
+}
+
 public sealed partial class DoneScreen : Screen
 {
-    public DoneScreen(string? folder, int savedCount, int discardedCount, int eraseCount, string? eraseRefusal, bool canUndo,
-        Func<Task> erase, Func<Task> undo)
+    public DoneScreen(IReadOnlyList<FolderLink> folders, int savedCount, int discardedCount, int eraseCount,
+        string? eraseRefusal, bool canUndo, Func<Task> erase, Func<Task> undo)
     {
         DiscardedText = discardedCount == 0 ? null
             : $"{discardedCount:N0} {(discardedCount == 1 ? "bilde" : "bilder")} er sortert bort. " +
@@ -103,18 +117,19 @@ public sealed partial class DoneScreen : Screen
         Erase = new Confirmation(erase);
         Undo = new Confirmation(undo);
         CanUndo = canUndo;
-        Folder = folder;
-        Title = folder is null
+        Folders = folders;
+        Title = folders.Count == 0
             ? "Alle bildene på kortet var lagret fra før."
-            : $"Ferdig. {savedCount:N0} {(savedCount == 1 ? "bilde er" : "bilder er")} lagret i:";
+            : $"Ferdig. {savedCount:N0} {(savedCount == 1 ? "bilde er" : "bilder er")} lagret" +
+              (folders.Count == 1 ? " i:" : $" i {folders.Count} mapper:");
         EraseCount = eraseCount;
         EraseRefusal = eraseRefusal;
     }
 
     public string Title { get; }
     public string? DiscardedText { get; }
-    public string? Folder { get; }
-    public bool HasFolder => Folder is not null;
+    public IReadOnlyList<FolderLink> Folders { get; }
+    public bool HasFolder => Folders.Count > 0;
 
     public int EraseCount { get; }
     public string? EraseRefusal { get; }
@@ -127,12 +142,6 @@ public sealed partial class DoneScreen : Screen
     public Confirmation Erase { get; }
     public Confirmation Undo { get; }
     public bool CanUndo { get; }
-
-    [RelayCommand]
-    private void OpenFolder()
-    {
-        if (Folder is not null) Platform.OpenFolder(Folder);
-    }
 }
 
 /// <summary>"Mine importer": every past import, so nobody ever has to remember or type a path.</summary>
@@ -145,28 +154,23 @@ public sealed partial class ImportsScreen(IReadOnlyList<ImportRow> rows, Action 
     private void Close() => close();
 }
 
+/// <summary>One import (one card): its folders, one per place, and a way back for the first day.</summary>
 public sealed partial class ImportRow : ObservableObject
 {
-    public ImportRow(string folder, DateTime createdUtc, int imageCount, int discardedCount, bool folderExists, bool canUndo,
-        Func<Task> undo)
+    public ImportRow(IReadOnlyList<FolderLink> folders, DateTime createdUtc, bool canUndo, Func<Task> undo)
     {
         Undo = new Confirmation(undo);
-        Folder = folder;
-        Name = Path.GetFileName(folder);
-        Details = $"Lagret {createdUtc.ToLocalTime():d. MMMM yyyy 'kl.' HH:mm} · {imageCount:N0} {(imageCount == 1 ? "bilde" : "bilder")}"
-                  + (discardedCount > 0 ? $" · {discardedCount:N0} sortert bort" : "");
-        FolderExists = folderExists;
+        Folders = folders;
+        Details = $"Lagret {createdUtc.ToLocalTime():d. MMMM yyyy 'kl.' HH:mm}";
         CanUndo = canUndo;
+        UndoText = folders.Count > 1
+            ? $"Angre hele importen? Bildene i alle {folders.Count} mappene flyttes tilbake, og du kan lagre dem på nytt. Ingen bilder blir slettet."
+            : "Angre denne importen? Bildene flyttes tilbake fra mappen, og du kan lagre dem på nytt. Ingen bilder blir slettet.";
     }
 
-    public string Folder { get; }
-    public string Name { get; }
+    public IReadOnlyList<FolderLink> Folders { get; }
     public string Details { get; }
-    public bool FolderExists { get; }
-    public bool FolderMissing => !FolderExists;
     public bool CanUndo { get; }
+    public string UndoText { get; }
     public Confirmation Undo { get; }
-
-    [RelayCommand]
-    private void OpenFolder() => Platform.OpenFolder(Folder);
 }
