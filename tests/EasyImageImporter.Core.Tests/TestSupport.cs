@@ -21,10 +21,17 @@ public sealed class TestEnv : IDisposable
     public TestEnv()
     {
         Paths = new AppPaths(Path.Combine(Root, "data"), Path.Combine(Root, "Pictures", "Viltkamera"));
+        Fs.RecycleBin = RecycleBin;
         Directory.CreateDirectory(Card);
         Directory.CreateDirectory(Paths.DataRoot);
         Store = new ImportStore(new Database(Paths.DatabasePath), Time);
     }
+
+    /// <summary>Stands in for the recycle bin, so tests can see what was put there.</summary>
+    public string RecycleBin => Path.Combine(Root, "papirkurv");
+
+    public IEnumerable<string> RecycledFiles() =>
+        Directory.Exists(RecycleBin) ? Directory.EnumerateFiles(RecycleBin, "*", SearchOption.AllDirectories) : [];
 
     public CardScanner Scanner => new(Fs, Store);
     public CopyEngine Copier => new(Fs, Store, Paths) { RetryDelay = TimeSpan.Zero };
@@ -103,6 +110,7 @@ public sealed class FakeTime(DateTimeOffset now) : TimeProvider
 {
     public DateTimeOffset Now { get; set; } = now;
     public override DateTimeOffset GetUtcNow() => Now;
+    public void Advance(TimeSpan by) => Now += by;
     public override TimeZoneInfo LocalTimeZone => TimeZoneInfo.Utc;
 }
 
@@ -112,6 +120,20 @@ public sealed class FakeTime(DateTimeOffset now) : TimeProvider
 public sealed class FaultyFileSystem : IFileSystem
 {
     private readonly PhysicalFileSystem _inner = new();
+
+    /// <summary>Where "the recycle bin" is for this test run.</summary>
+    public string? RecycleBin { get; set; }
+
+    public bool MoveToRecycleBin(string path)
+    {
+        if (RecycleBin is null) return false;
+        Directory.CreateDirectory(RecycleBin);
+        var target = Path.Combine(RecycleBin, Path.GetFileName(path.TrimEnd(Path.DirectorySeparatorChar)));
+        for (var n = 2; File.Exists(target) || Directory.Exists(target); n++) target += $" ({n})";
+        if (Directory.Exists(path)) Directory.Move(path, target);
+        else File.Move(path, target);
+        return true;
+    }
 
     /// <summary>Called with the number of bytes read so far from a card file. Throw to simulate a failure.</summary>
     public Action<string, long>? OnSourceRead { get; set; }

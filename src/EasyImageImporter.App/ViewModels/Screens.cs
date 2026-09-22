@@ -58,13 +58,16 @@ public sealed partial class Confirmation(Func<Task> onConfirm) : ObservableObjec
     private Task Confirm() => onConfirm();
 }
 
-public sealed partial class IdleScreen(Func<Task> chooseFolder, Action showImports) : Screen
+public sealed partial class IdleScreen(Func<Task> chooseFolder, Action showImports, Action showSettings) : Screen
 {
     [RelayCommand]
     private Task ChooseFolder() => chooseFolder();
 
     [RelayCommand]
     private void ShowImports() => showImports();
+
+    [RelayCommand]
+    private void ShowSettings() => showSettings();
 }
 
 public sealed partial class WorkingScreen : Screen
@@ -143,11 +146,14 @@ public sealed partial class DoneScreen : Screen
     public override int Step => FlowStep.Erase;
 
     public DoneScreen(IReadOnlyList<FolderLink> folders, int savedCount, int discardedCount, int eraseCount,
-        string? eraseRefusal, bool canUndo, Func<Task> erase, Func<Task> undo)
+        string? eraseRefusal, bool canUndo, bool discardedToRecycleBin, Func<Task> erase, Func<Task> undo)
     {
         DiscardedText = discardedCount == 0 ? null
             : $"{discardedCount:N0} {(discardedCount == 1 ? "bilde" : "bilder")} er sortert bort. " +
-              $"De ligger i undermappen «{EasyImageImporter.Core.Import.Finalizer.DiscardedFolderName}», og er ikke slettet.";
+              $"De ligger i undermappen «{EasyImageImporter.Core.Import.Finalizer.DiscardedFolderName}»" +
+              (discardedToRecycleBin
+                  ? ", og flyttes til papirkurven i morgen. Der kan du fortsatt hente dem tilbake."
+                  : ", og er ikke slettet.");
         Erase = new Confirmation(erase);
         Undo = new Confirmation(undo);
         CanUndo = canUndo;

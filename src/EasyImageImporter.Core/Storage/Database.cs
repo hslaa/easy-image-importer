@@ -186,6 +186,15 @@ public sealed class Database
         );
         ALTER TABLE sequences ADD COLUMN suggestion_state TEXT;   -- null | accepted | dismissed
         """,
+        // 7: settings the user can change, and when an import's sorted-away photos were cleared out.
+        """
+        CREATE TABLE settings(
+            key   TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
+
+        ALTER TABLE imports ADD COLUMN discarded_cleared_utc TEXT;
+        """,
     ];
 
     private readonly string _connectionString;

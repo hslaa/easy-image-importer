@@ -79,6 +79,8 @@ void Fresh()
     Shot(window, "idle");
     vm.ShowImports();
     Shot(window, "imports-empty");
+    vm.ShowSettings();
+    Shot(window, "settings");
     window.Close();
     vm.Dispose();
 }

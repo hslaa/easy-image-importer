@@ -10,6 +10,7 @@
                     <NativeMenu>
                         <NativeMenuItem Header="Åpne" Click="OnOpenClicked" />
                         <NativeMenuItem Header="Mine importer" Click="OnImportsClicked" />
+                        <NativeMenuItem Header="Innstillinger" Click="OnSettingsClicked" />
                         <NativeMenuItemSeparator />
                         <NativeMenuItem Header="Avslutt" Click="OnQuitClicked" />
                     </NativeMenu>
