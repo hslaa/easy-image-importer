@@ -51,7 +51,6 @@
                         </Button>
                         <Button Content="Velg mappe selv …" Command="{Binding ChooseFolderCommand}"
                                 ToolTip.Tip="For bilder som ikke ligger på et minnekort" />
-                        <Button Content="Innstillinger" Command="{Binding ShowSettingsCommand}" />
                     </StackPanel>
                 </StackPanel>
             </ScrollViewer>
@@ -304,10 +303,12 @@
 
     <Panel>
         <DockPanel IsVisible="{Binding Overlay, Converter={x:Static ObjectConverters.IsNull}}">
-            <!-- Where you are: Kopier · Gå gjennom · Navn og merking · Tøm kortet. -->
+            <!-- Where you are: Kopier · Gå gjennom · Navn og merking · Tøm kortet — and, from every
+                 screen, the way to "Mine importer" and the settings. -->
             <Border DockPanel.Dock="Top" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource LineBrush}"
-                    BorderThickness="0,0,0,1" Padding="32,12" IsVisible="{Binding HasSteps}">
-                <ItemsControl ItemsSource="{Binding Steps}">
+                    BorderThickness="0,0,0,1" Padding="20,10">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                <ItemsControl ItemsSource="{Binding Steps}" VerticalAlignment="Center" IsVisible="{Binding HasSteps}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
@@ -323,14 +324,23 @@
                                               IsVisible="{Binding IsDone}" />
                                     </Panel>
                                 </Border>
-                                <TextBlock Classes="small" Text="{Binding Label}" VerticalAlignment="Center"
+                                <TextBlock Classes="caption" Text="{Binding Label}" VerticalAlignment="Center"
                                            Classes.strong="{Binding IsCurrent}" Classes.muted="{Binding IsTodo}" />
-                                <Border Width="36" Height="2" Background="{StaticResource LineBrush}" Margin="4,0,14,0"
+                                <Border Width="24" Height="2" Background="{StaticResource LineBrush}" Margin="4,0,10,0"
                                         VerticalAlignment="Center" IsVisible="{Binding !IsLast}" />
                             </StackPanel>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                    <Button Classes="link" FontSize="14" Command="{Binding ShowSettingsCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <Path Classes="icon" Data="{StaticResource IconSettings}" Width="17" Height="17" Stretch="Uniform" />
+                            <TextBlock Text="Innstillinger" FontSize="14" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+                </Grid>
             </Border>
             <ContentControl Content="{Binding Screen}" />
         </DockPanel>

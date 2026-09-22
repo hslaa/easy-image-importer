@@ -2,6 +2,7 @@ using Avalonia.Threading;
 using EasyImageImporter.App.ViewModels.Review;
 using EasyImageImporter.Core.Review;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using Serilog;
 using EasyImageImporter.Core.Cards;
 using EasyImageImporter.Core.Import;
@@ -343,11 +344,13 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>Settings, on top of the flow like "Mine importer": nothing is interrupted.</summary>
+    [RelayCommand]
     public void ShowSettings() =>
         Overlay = new SettingsScreen(_settings, _paths, _cleanup, _fs,
             pickFolder: () => PickFolder?.Invoke() ?? Task.FromResult<string?>(null),
             close: () => Overlay = null);
 
+    [RelayCommand]
     public void ShowImports()
     {
         var rows = _store.GetImports().Select(import => new ImportRow(
