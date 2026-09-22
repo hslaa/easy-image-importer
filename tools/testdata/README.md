@@ -79,3 +79,17 @@ Images are fetched over plain HTTPS from LILA's public GCP bucket:
   are ~3.8 MB each.
 - The Duck camera's EXIF `Make` contains a literal tab (`BURREL BY SPROMISE<TAB>E`), and exiftool
   warns that its maker notes can't be parsed. Both come from the original files.
+
+## A test card for a Windows VM
+
+```bash
+python3 tools/testdata/build_vhd.py testdata/cards/three-sites viltkamera-test.vhd
+```
+
+Makes a fixed-size VHD holding the card. Double-click it in Windows (or Disk Management >
+Attach VHD) and it turns up as a writable drive named VILTKAM with a DCIM folder, so the whole
+flow can be tried, including emptying the card. An ISO cannot be used: Windows mounts it as a
+read-only CD, which the app skips when looking for cards.
+
+A mounted VHD is not a card reader, so ejecting behaves differently: the volume is dismounted
+but the drive stays. Ejecting needs a try on a PC with a real reader.
