@@ -69,6 +69,20 @@ jobs:
           Copy-Item "$dir/exiftool(-k).exe" publish/exiftool/exiftool.exe
           & publish/exiftool/exiftool.exe -ver
 
+      # ONNX Runtime (animal recognition) is built with MSVC and needs the Visual C++ runtime,
+      # which a fresh Windows install may not have. Microsoft allows shipping these next to the
+      # app, so nobody has to install anything.
+      - name: Bundle the Visual C++ runtime
+        shell: pwsh
+        run: |
+          $redist = Get-ChildItem "C:/Program Files/Microsoft Visual Studio/*/*/VC/Redist/MSVC/*/x64/Microsoft.VC*.CRT" |
+            Sort-Object Name | Select-Object -Last 1
+          if (-not $redist) { throw "No Visual C++ redistributable found on the runner" }
+          foreach ($dll in "vcruntime140.dll", "vcruntime140_1.dll", "msvcp140.dll") {
+            Copy-Item "$($redist.FullName)/$dll" publish/ -ErrorAction Stop
+          }
+          Write-Host "Bundled from $($redist.FullName)"
+
       - run: dotnet tool install -g vpk --version 1.2.0
 
       - name: Fetch previous release (enables small delta updates)
