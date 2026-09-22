@@ -57,6 +57,12 @@ public partial class App : Application
         _viewModel?.ShowImports();
     }
 
+    private void OnSettingsClicked(object? sender, EventArgs e)
+    {
+        ShowWindow();
+        _viewModel?.ShowSettings();
+    }
+
     private void OnQuitClicked(object? sender, EventArgs e)
     {
         // Safe at any point: every step resumes from the database on next start.

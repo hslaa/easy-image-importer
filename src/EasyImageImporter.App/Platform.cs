@@ -16,11 +16,15 @@ internal static class Platform
     {
         var data = Environment.GetEnvironmentVariable("EASYIMAGEIMPORTER_DATA")
                    ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "EasyImageImporterData");
-        var archive = Environment.GetEnvironmentVariable("EASYIMAGEIMPORTER_ARCHIVE")
-                      ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "Viltkamera");
         Directory.CreateDirectory(data);
-        return new AppPaths(data, archive);
+        return new AppPaths(data, ArchiveOverride ?? DefaultArchive);
     }
+
+    /// <summary>A development run's archive folder; when set, the setting is ignored.</summary>
+    public static string? ArchiveOverride => Environment.GetEnvironmentVariable("EASYIMAGEIMPORTER_ARCHIVE");
+
+    public static string DefaultArchive =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "Viltkamera");
 
     public static void OpenFolder(string path)
     {

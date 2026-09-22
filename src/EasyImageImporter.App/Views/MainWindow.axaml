@@ -233,6 +233,60 @@
             </DockPanel>
         </DataTemplate>
 
+        <DataTemplate DataType="vm:SettingsScreen">
+            <DockPanel>
+                <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*" Margin="32,20,32,14">
+                    <Button Command="{Binding CloseCommand}" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Path Classes="icon" Data="{StaticResource IconBack}" />
+                            <TextBlock Text="Tilbake" />
+                        </StackPanel>
+                    </Button>
+                    <TextBlock Grid.Column="1" Classes="title" Text="Innstillinger" VerticalAlignment="Center" Margin="20,0" />
+                </Grid>
+                <Border DockPanel.Dock="Top" Height="1" Background="{StaticResource LineBrush}" />
+
+                <ScrollViewer>
+                    <StackPanel Margin="32,20,32,24" Spacing="16" MaxWidth="820" HorizontalAlignment="Left">
+                        <Border Classes="card" Padding="24,20">
+                            <StackPanel Spacing="10">
+                                <TextBlock Classes="heading" Text="Mappe for bildene" />
+                                <Border Background="{StaticResource SunkenBrush}" CornerRadius="8" Padding="14,10">
+                                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                                        <Path Classes="icon" Data="{StaticResource IconFolder}" Stroke="{StaticResource MutedBrush}" />
+                                        <TextBlock Grid.Column="1" Text="{Binding Folder}" VerticalAlignment="Center"
+                                                   TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
+                                                   ToolTip.Tip="{Binding Folder}" />
+                                    </Grid>
+                                </Border>
+                                <TextBlock Classes="small muted" Text="{Binding FolderNote}" />
+                                <TextBlock Classes="small warning" Text="{Binding FolderProblem}"
+                                           IsVisible="{Binding FolderProblem, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                <WrapPanel IsVisible="{Binding CanChangeFolder}">
+                                    <Button Content="Velg mappe …" Command="{Binding ChooseFolderCommand}" Margin="0,4,12,0" />
+                                    <Button Classes="link" Content="Bruk standardmappen" Command="{Binding UseDefaultFolderCommand}"
+                                            IsVisible="{Binding !IsDefaultFolder}" Margin="0,4,0,0" />
+                                </WrapPanel>
+                                <TextBlock Classes="small muted" IsVisible="{Binding Locked}"
+                                           Text="Mappen er satt av en miljøvariabel for denne kjøringen, og kan ikke endres her." />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="card" Padding="24,20">
+                            <StackPanel Spacing="10">
+                                <TextBlock Classes="heading" Text="Bilder du sorterer bort" />
+                                <CheckBox IsChecked="{Binding ToRecycleBin}" FontSize="18"
+                                          Content="Legg dem i papirkurven etter ett døgn" />
+                                <TextBlock Classes="small muted"
+                                           Text="De ligger først i mappen «Sortert bort», så «Angre importen» kan hente dem tilbake. Etter det havner de i papirkurven, der du kan gjenopprette dem, og der de ikke tar plass for alltid." />
+                                <TextBlock Classes="small muted" Text="{Binding DiscardedNote}" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </DockPanel>
+        </DataTemplate>
+
         <DataTemplate DataType="review:ReviewScreen">
             <views:ReviewView />
         </DataTemplate>
@@ -249,10 +303,12 @@
 
     <Panel>
         <DockPanel IsVisible="{Binding Overlay, Converter={x:Static ObjectConverters.IsNull}}">
-            <!-- Where you are: Kopier · Gå gjennom · Navn og merking · Tøm kortet. -->
+            <!-- Where you are: Kopier · Gå gjennom · Navn og merking · Tøm kortet — and, from every
+                 screen, the way to "Mine importer" and the settings. -->
             <Border DockPanel.Dock="Top" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource LineBrush}"
-                    BorderThickness="0,0,0,1" Padding="32,12" IsVisible="{Binding HasSteps}">
-                <ItemsControl ItemsSource="{Binding Steps}">
+                    BorderThickness="0,0,0,1" Padding="20,10">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                <ItemsControl ItemsSource="{Binding Steps}" VerticalAlignment="Center" IsVisible="{Binding HasSteps}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
@@ -268,14 +324,23 @@
                                               IsVisible="{Binding IsDone}" />
                                     </Panel>
                                 </Border>
-                                <TextBlock Classes="small" Text="{Binding Label}" VerticalAlignment="Center"
+                                <TextBlock Classes="caption" Text="{Binding Label}" VerticalAlignment="Center"
                                            Classes.strong="{Binding IsCurrent}" Classes.muted="{Binding IsTodo}" />
-                                <Border Width="36" Height="2" Background="{StaticResource LineBrush}" Margin="4,0,14,0"
+                                <Border Width="24" Height="2" Background="{StaticResource LineBrush}" Margin="4,0,10,0"
                                         VerticalAlignment="Center" IsVisible="{Binding !IsLast}" />
                             </StackPanel>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                    <Button Classes="link" FontSize="14" Command="{Binding ShowSettingsCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <Path Classes="icon" Data="{StaticResource IconSettings}" Width="17" Height="17" Stretch="Uniform" />
+                            <TextBlock Text="Innstillinger" FontSize="14" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+                </Grid>
             </Border>
             <ContentControl Content="{Binding Screen}" />
         </DockPanel>

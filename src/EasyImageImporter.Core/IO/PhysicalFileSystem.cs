@@ -1,3 +1,6 @@
+using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
+
 namespace EasyImageImporter.Core.IO;
 
 public sealed class PhysicalFileSystem : IFileSystem
@@ -56,6 +59,61 @@ public sealed class PhysicalFileSystem : IFileSystem
         while (!Directory.Exists(full)) full = Path.GetDirectoryName(full)!;
         return new DriveInfo(full).AvailableFreeSpace;
     }
+
+    public bool MoveToRecycleBin(string path)
+    {
+        if (!File.Exists(path) && !Directory.Exists(path)) return true;
+        if (OperatingSystem.IsWindows()) return RecycleOnWindows(path);
+        if (OperatingSystem.IsMacOS()) return MoveToMacTrash(path);
+        return false;
+    }
+
+    /// <summary>The shell's own delete, with "allow undo": exactly what Explorer's Delete does.</summary>
+    [SupportedOSPlatform("windows")]
+    private static bool RecycleOnWindows(string path)
+    {
+        const uint Delete = 0x0003;
+        const ushort AllowUndo = 0x0040, NoConfirmation = 0x0010, Silent = 0x0004, NoErrorUi = 0x0400;
+        var operation = new ShFileOpStruct
+        {
+            Func = Delete,
+            From = Path.GetFullPath(path) + '\0' + '\0', // the shell takes a double-null-terminated list
+            Flags = AllowUndo | NoConfirmation | Silent | NoErrorUi,
+        };
+        return SHFileOperationW(ref operation) == 0 && !operation.Aborted;
+    }
+
+    [SupportedOSPlatform("macos")]
+    private static bool MoveToMacTrash(string path)
+    {
+        var trash = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".Trash");
+        Directory.CreateDirectory(trash);
+        var name = Path.GetFileName(path.TrimEnd(Path.DirectorySeparatorChar));
+        var target = Path.Combine(trash, name);
+        for (var n = 2; File.Exists(target) || Directory.Exists(target); n++)
+            target = Path.Combine(trash, $"{Path.GetFileNameWithoutExtension(name)} {n}{Path.GetExtension(name)}");
+        if (Directory.Exists(path)) Directory.Move(path, target);
+        else File.Move(path, target);
+        return true;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct ShFileOpStruct
+    {
+        public IntPtr Window;
+        public uint Func;
+        [MarshalAs(UnmanagedType.LPWStr)] public string From;
+        [MarshalAs(UnmanagedType.LPWStr)] public string? To;
+        public ushort Flags;
+        [MarshalAs(UnmanagedType.Bool)] public bool Aborted;
+        public IntPtr NameMappings;
+        [MarshalAs(UnmanagedType.LPWStr)] public string? ProgressTitle;
+    }
+
+#pragma warning disable SYSLIB1054 // LibraryImport needs unsafe code for this struct; one call doesn't warrant it.
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    private static extern int SHFileOperationW(ref ShFileOpStruct operation);
+#pragma warning restore SYSLIB1054
 
     public bool IsSameVolume(string pathA, string pathB) =>
         string.Equals(MountPointOf(pathA), MountPointOf(pathB),

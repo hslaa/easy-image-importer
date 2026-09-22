@@ -10,6 +10,7 @@
                     <NativeMenu>
                         <NativeMenuItem Header="Åpne" Click="OnOpenClicked" />
                         <NativeMenuItem Header="Mine importer" Click="OnImportsClicked" />
+                        <NativeMenuItem Header="Innstillinger" Click="OnSettingsClicked" />
                         <NativeMenuItemSeparator />
                         <NativeMenuItem Header="Avslutt" Click="OnQuitClicked" />
                     </NativeMenu>
@@ -55,6 +56,7 @@
         <StreamGeometry x:Key="IconCard">M7,2.5 L15.5,2.5 L19.5,6.5 L19.5,21.5 L4.5,21.5 L4.5,5 Z M9,3 L9,7 M12,3 L12,7 M15,3.5 L15,7</StreamGeometry>
         <StreamGeometry x:Key="IconWarning">M12,3.5 L21.5,20 L2.5,20 Z M12,9.5 L12,14 M12,17 L12,17.2</StreamGeometry>
         <StreamGeometry x:Key="IconInfo">M12,3 A9,9 0 1 1 11.99,3 Z M12,11 L12,16.5 M12,7.8 L12,8</StreamGeometry>
+        <StreamGeometry x:Key="IconSettings">M21.18,9.97 L21.30,10.61 L21.37,11.26 L21.40,11.92 L21.38,12.57 L21.32,13.23 L21.21,13.87 L21.18,14.03 L18.02,13.84 L17.88,14.26 L17.71,14.66 L17.56,14.96 L19.93,17.05 L19.56,17.59 L19.15,18.10 L18.70,18.59 L18.23,19.04 L17.72,19.46 L17.19,19.84 L17.05,19.93 L14.96,17.56 L14.56,17.76 L14.15,17.92 L13.84,18.02 L14.03,21.18 L13.39,21.30 L12.74,21.37 L12.08,21.40 L11.43,21.38 L10.77,21.32 L10.13,21.21 L9.97,21.18 L10.16,18.02 L9.74,17.88 L9.34,17.71 L9.04,17.56 L6.95,19.93 L6.41,19.56 L5.90,19.15 L5.41,18.70 L4.96,18.23 L4.54,17.72 L4.16,17.19 L4.07,17.05 L6.44,14.96 L6.24,14.56 L6.08,14.15 L5.98,13.84 L2.82,14.03 L2.70,13.39 L2.63,12.74 L2.60,12.08 L2.62,11.43 L2.68,10.77 L2.79,10.13 L2.82,9.97 L5.98,10.16 L6.12,9.74 L6.29,9.34 L6.44,9.04 L4.07,6.95 L4.44,6.41 L4.85,5.90 L5.30,5.41 L5.77,4.96 L6.28,4.54 L6.81,4.16 L6.95,4.07 L9.04,6.44 L9.44,6.24 L9.85,6.08 L10.16,5.98 L9.97,2.82 L10.61,2.70 L11.26,2.63 L11.92,2.60 L12.57,2.62 L13.23,2.68 L13.87,2.79 L14.03,2.82 L13.84,5.98 L14.26,6.12 L14.66,6.29 L14.96,6.44 L17.05,4.07 L17.59,4.44 L18.10,4.85 L18.59,5.30 L19.04,5.77 L19.46,6.28 L19.84,6.81 L19.93,6.95 L17.56,9.04 L17.76,9.44 L17.92,9.85 L18.02,10.16 Z M8.70,12.00 A3.3,3.3 0 0 1 15.30,12.00 A3.3,3.3 0 0 1 8.70,12.00 Z</StreamGeometry>
         <StreamGeometry x:Key="IconSparkle">M12,3 L13.8,10.2 L21,12 L13.8,13.8 L12,21 L10.2,13.8 L3,12 L10.2,10.2 Z</StreamGeometry>
     </Application.Resources>
 

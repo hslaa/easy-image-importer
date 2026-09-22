@@ -2,6 +2,7 @@ using Avalonia.Threading;
 using EasyImageImporter.App.ViewModels.Review;
 using EasyImageImporter.Core.Review;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using Serilog;
 using EasyImageImporter.Core.Cards;
 using EasyImageImporter.Core.Import;
@@ -18,6 +19,9 @@ namespace EasyImageImporter.App.ViewModels;
 public sealed partial class MainViewModel : ObservableObject, IDisposable
 {
     private readonly ImportStore _store;
+    private readonly AppPaths _paths;
+    private readonly AppSettings _settings;
+    private readonly DiscardedCleanup _cleanup;
     private readonly CardScanner _scanner;
     private readonly CopyEngine _copier;
     private readonly Finalizer _finalizer;
@@ -29,6 +33,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private ReviewFlow? _flow;
     private readonly Recovery _recovery;
     private readonly CardWatcher _watcher = new(new SystemDriveProvider());
+    private readonly IFileSystem _fs;
     private readonly ICardEjector _ejector = new CardEjector();
 
     /// <summary>The card is emptied but couldn't be ejected: taking it out counts as done.</summary>
@@ -47,14 +52,17 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [NotifyPropertyChangedFor(nameof(Steps), nameof(HasSteps))]
     private Screen _screen;
 
-    /// <summary>"Mine importer", shown on top of the flow without interrupting it.</summary>
-    [ObservableProperty] private ImportsScreen? _overlay;
+    /// <summary>"Mine importer" or settings, shown on top of the flow without interrupting it.</summary>
+    [ObservableProperty] private Screen? _overlay;
 
     public MainViewModel()
     {
-        var paths = Platform.Paths();
-        IFileSystem fs = new PhysicalFileSystem();
+        var paths = _paths = Platform.Paths();
+        IFileSystem fs = _fs = new PhysicalFileSystem();
         _store = new ImportStore(new Database(paths.DatabasePath));
+        _settings = new AppSettings(_store);
+        // The folder the user picked, unless a development run points somewhere else.
+        if (Platform.ArchiveOverride is null && _settings.ArchiveRoot is { } chosen) paths.ArchiveRoot = chosen;
         _scanner = new CardScanner(fs, _store);
         _copier = new CopyEngine(fs, _store, paths);
         _finalizer = new Finalizer(fs, _store, paths,
@@ -64,7 +72,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _review = new ReviewService(_store, paths);
         _thumbnails = new ThumbnailLoader(new ThumbnailCache(Path.Combine(paths.DataRoot, "thumbs")));
         _recognition = new AnimalRecognition(Path.Combine(paths.DataRoot, "models"), _store, _review);
-        _recovery = new Recovery(_store, _finalizer, _undo);
+        _cleanup = new DiscardedCleanup(fs, _store, _settings);
+        _recovery = new Recovery(_store, _finalizer, _undo, _cleanup);
         Screen = Idle();
     }
 
@@ -234,6 +243,11 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         });
         var import = await Task.Run(() => _finalizer.Run(session.Id, progress));
         Log.Information("Session {Session} saved to {Folder}", session.Id, import?.FolderPath ?? "(nothing new)");
+        _ = Task.Run(() =>
+        {
+            var freed = _cleanup.Run();
+            if (freed.Files > 0) Log.Information("Cleared {Files} sorted-away photos, {Bytes} bytes", freed.Files, freed.Bytes);
+        });
         await ShowDoneAsync(session);
     }
 
@@ -251,7 +265,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         var decision = _eraser.Evaluate(session.Id);
         var canUndo = import is not null && _undo.Evaluate(import.Id).Allowed;
         Show(new DoneScreen(import is null ? [] : FoldersOf(import), import?.ImageCount ?? 0, import?.DiscardedCount ?? 0,
-            decision.Count, decision.Reason, canUndo,
+            decision.Count, decision.Reason, canUndo, _settings.DiscardedToRecycleBin,
             erase: () => RunGuardedAsync(() => EraseAsync(session)),
             undo: () => RunGuardedAsync(() => UndoAsync(import!.Id))));
         return Task.CompletedTask;
@@ -329,6 +343,14 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         await ContinueAsync(_store.GetSession(import.SessionId));
     }
 
+    /// <summary>Settings, on top of the flow like "Mine importer": nothing is interrupted.</summary>
+    [RelayCommand]
+    public void ShowSettings() =>
+        Overlay = new SettingsScreen(_settings, _paths, _cleanup, _fs,
+            pickFolder: () => PickFolder?.Invoke() ?? Task.FromResult<string?>(null),
+            close: () => Overlay = null);
+
+    [RelayCommand]
     public void ShowImports()
     {
         var rows = _store.GetImports().Select(import => new ImportRow(
@@ -368,7 +390,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private static WorkingScreen Working(string title, string detail = "", int step = 0) =>
         new() { Title = title, Detail = detail, InStep = step };
 
-    private IdleScreen Idle() => new(ChooseFolderAsync, ShowImports);
+    private IdleScreen Idle() => new(ChooseFolderAsync, ShowImports, ShowSettings);
 
     private async Task ChooseFolderAsync()
     {
