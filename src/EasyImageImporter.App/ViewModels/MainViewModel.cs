@@ -251,12 +251,29 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         await ShowDoneAsync(session);
     }
 
+    /// <summary>The import's folders, one per place with photos kept. None if everything was sorted away.</summary>
     private IReadOnlyList<FolderLink> FoldersOf(ImportRecord import)
     {
         var folders = _store.GetImportFolders(import.Id);
-        return folders.Count > 0
-            ? folders.Select(f => new FolderLink(f.FolderPath, f.ImageCount, f.DiscardedCount)).ToList()
-            : [new FolderLink(import.FolderPath, import.ImageCount, import.DiscardedCount)];
+        return folders.Count > 0 ? folders.Select(f => new FolderLink(f.FolderPath, f.ImageCount)).ToList()
+            : import.FolderPath.Length > 0 ? [new FolderLink(import.FolderPath, import.ImageCount)]
+            : [];
+    }
+
+    /// <summary>
+    /// "Mine importer" only: the photos sorted away are kept out of sight for a while, and this is
+    /// the quiet way to find them again. Null once they are gone.
+    /// </summary>
+    private DiscardedLink? DiscardedOf(ImportRecord import)
+    {
+        if (import.DiscardedCount == 0) return null;
+        var space = _cleanup.Measure(import);
+        if (space.Files == 0) return null;
+        var folders = _cleanup.Folders(import);
+        var parents = folders.Select(Path.GetDirectoryName).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        var folder = folders.Count == 1 ? folders[0] : parents.Count == 1 ? parents[0]! : folders[0];
+        var until = _cleanup.ClearedAfterUtc(import) is { } t ? $", til {t.ToLocalTime():d. MMMM}" : "";
+        return new DiscardedLink($"{space.Files:N0} {(space.Files == 1 ? "bilde" : "bilder")} sortert bort{until}", folder);
     }
 
     private Task ShowDoneAsync(Session session)
@@ -265,7 +282,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         var decision = _eraser.Evaluate(session.Id);
         var canUndo = import is not null && _undo.Evaluate(import.Id).Allowed;
         Show(new DoneScreen(import is null ? [] : FoldersOf(import), import?.ImageCount ?? 0, import?.DiscardedCount ?? 0,
-            decision.Count, decision.Reason, canUndo, _settings.DiscardedToRecycleBin,
+            decision.Count, decision.Reason, canUndo,
             erase: () => RunGuardedAsync(() => EraseAsync(session)),
             undo: () => RunGuardedAsync(() => UndoAsync(import!.Id))));
         return Task.CompletedTask;
@@ -354,7 +371,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public void ShowImports()
     {
         var rows = _store.GetImports().Select(import => new ImportRow(
-            FoldersOf(import), import.CreatedUtc,
+            FoldersOf(import), DiscardedOf(import), import.CreatedUtc,
             canUndo: !_busy && _undo.Evaluate(import.Id).Allowed,
             undo: () => _busy ? Task.CompletedTask : RunGuardedAsync(() => UndoAsync(import.Id)))).ToList();
         Overlay = new ImportsScreen(rows, close: () => Overlay = null);

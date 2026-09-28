@@ -44,6 +44,7 @@ if (!Directory.Exists(snapshot)) Prepare();
 Fresh();
 Walk(withModels: false, only: ["review"], prefix: "a");
 Walk(withModels: true, only: null, prefix: "b");
+Walk(withModels: false, only: null, prefix: "c", discardAll: true);
 Console.WriteLine($"Screenshots in {shots}");
 return;
 
@@ -62,9 +63,12 @@ void Prepare()
     Shot(window, "0-copying");
     Pump(() => vm.Screen is ReviewScreen, 600_000);
     var review = (ReviewScreen)vm.Screen;
-    Pump(() => review.Recognition.Status is RecognitionStatus.Analysing && review.Recognition.Progress > 10, 600_000);
-    Shot(window, "0-review-analysing");
-    Pump(() => review.Recognition.Status is RecognitionStatus.Done, 1_800_000);
+    if (models != "-")
+    {
+        Pump(() => review.Recognition.Status is RecognitionStatus.Analysing && review.Recognition.Progress > 10, 600_000);
+        Shot(window, "0-review-analysing");
+        Pump(() => review.Recognition.Status is RecognitionStatus.Done, 1_800_000);
+    }
     window.Close();
     vm.Dispose();
     Reset(snapshot);
@@ -85,7 +89,7 @@ void Fresh()
     vm.Dispose();
 }
 
-void Walk(bool withModels, string[]? only, string prefix)
+void Walk(bool withModels, string[]? only, string prefix, bool discardAll = false)
 {
     Reset(live);
     CopyDir(snapshot, live);
@@ -99,6 +103,23 @@ void Walk(bool withModels, string[]? only, string prefix)
     shot("review");
     Small(window, () => shot("review-small"));
     if (only is not null) { window.Close(); vm.Dispose(); return; }
+
+    // The common case: nothing on the card worth keeping. One click, then straight to emptying it.
+    if (discardAll)
+    {
+        review.DiscardShownCommand.Execute(null);
+        shot("review-all-discarded");
+        review.NextCommand.Execute(null);
+        Pump(() => vm.Screen is DoneScreen, 300_000);
+        shot("done-all-discarded");
+        vm.ShowImports();
+        shot("imports-all-discarded");
+        vm.ShowSettings();
+        shot("settings-with-discarded");
+        window.Close();
+        vm.Dispose();
+        return;
+    }
 
     // A filter, then back to all.
     if (review.Filters.FirstOrDefault(f => f.Text.StartsWith("Tomme")) is { } empty)

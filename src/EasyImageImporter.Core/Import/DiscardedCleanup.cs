@@ -5,32 +5,37 @@ namespace EasyImageImporter.Core.Import;
 public sealed record DiscardedSpace(int Files, long Bytes);
 
 /// <summary>
-/// Puts the photos the user sorted away in the recycle bin, once the import can no longer be
-/// undone. Nothing is deleted: they can be restored from the bin, and the system empties it in
-/// its own time. Only files the app itself put in "Sortert bort" are touched — the list of moves
-/// says exactly which ones those are — so anything the user put there is left alone, as are the
-/// photos they kept.
+/// Puts the photos the user sorted away in the recycle bin once they have been kept long enough
+/// (<see cref="AppSettings.DiscardedKeepDays"/>). Nothing is deleted: they can be restored from the
+/// bin, and the system empties it in its own time. Only files the app itself sorted away are
+/// touched — the list of moves says exactly which ones those are — so anything the user put there
+/// is left alone, as are the photos they kept.
 /// </summary>
 public sealed class DiscardedCleanup(IFileSystem fs, ImportStore store, AppSettings settings, TimeProvider? time = null)
 {
     private readonly TimeProvider _time = time ?? TimeProvider.System;
 
-    /// <summary>Clears out every import past the undo window. Returns how much was moved.</summary>
+    /// <summary>How long an import's sorted-away photos are kept, or null for good.</summary>
+    public TimeSpan? KeepFor => settings.DiscardedKeepDays is { } days
+        // Never take away what the user could still undo: an undo puts these photos back.
+        ? TimeSpan.FromDays(days) > ImportUndo.Window ? TimeSpan.FromDays(days) : ImportUndo.Window
+        : null;
+
+    /// <summary>Clears out every import that has kept them long enough. Returns how much was moved.</summary>
     public DiscardedSpace Run()
     {
-        if (!settings.DiscardedToRecycleBin) return new DiscardedSpace(0, 0);
+        if (KeepFor is not { } keepFor) return new DiscardedSpace(0, 0);
 
         var (files, bytes) = (0, 0L);
         foreach (var import in store.GetImportsWithDiscarded())
         {
-            // Never take away what the user could still undo: an undo puts these photos back.
-            if (_time.GetUtcNow().UtcDateTime - import.CreatedUtc <= ImportUndo.Window) continue;
+            if (_time.GetUtcNow().UtcDateTime - import.CreatedUtc <= keepFor) continue;
 
             foreach (var folder in DiscardedPaths(import).Where(p => SizeOf(p) is not null)
                          .GroupBy(p => Path.GetDirectoryName(p)!, StringComparer.OrdinalIgnoreCase))
             {
-                // One "Sortert bort" in the bin per import reads better than loose photos, but
-                // only when everything in the folder is ours.
+                // One folder per place in the bin reads better than loose photos, but only when
+                // everything in the folder is ours.
                 if (fs.EnumerateFiles(folder.Key).Count() == folder.Count())
                 {
                     var size = folder.Sum(p => SizeOf(p) ?? 0);
@@ -60,14 +65,34 @@ public sealed class DiscardedCleanup(IFileSystem fs, ImportStore store, AppSetti
     {
         var (files, bytes) = (0, 0L);
         foreach (var import in store.GetImportsWithDiscarded())
-            foreach (var path in DiscardedPaths(import))
-            {
-                if (SizeOf(path) is not { } size) continue;
-                files++;
-                bytes += size;
-            }
+        {
+            var space = Measure(import);
+            files += space.Files;
+            bytes += space.Bytes;
+        }
         return new DiscardedSpace(files, bytes);
     }
+
+    /// <summary>What is still kept of one import's sorted-away photos.</summary>
+    public DiscardedSpace Measure(ImportRecord import)
+    {
+        var (files, bytes) = (0, 0L);
+        foreach (var path in DiscardedPaths(import))
+        {
+            if (SizeOf(path) is not { } size) continue;
+            files++;
+            bytes += size;
+        }
+        return new DiscardedSpace(files, bytes);
+    }
+
+    /// <summary>The folders one import's sorted-away photos are kept in, while they are there.</summary>
+    public IReadOnlyList<string> Folders(ImportRecord import) =>
+        DiscardedPaths(import).Where(p => SizeOf(p) is not null)
+            .Select(p => Path.GetDirectoryName(p)!).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+
+    /// <summary>When one import's sorted-away photos go to the bin, or null if they are kept for good.</summary>
+    public DateTime? ClearedAfterUtc(ImportRecord import) => KeepFor is { } keepFor ? import.CreatedUtc + keepFor : null;
 
     private bool Move(string path)
     {
@@ -93,10 +118,12 @@ public sealed class DiscardedCleanup(IFileSystem fs, ImportStore store, AppSetti
         }
     }
 
-    /// <summary>The moves that ended up in a "Sortert bort" folder, and were actually carried out.</summary>
-    private IEnumerable<string> DiscardedPaths(ImportRecord import) =>
-        store.GetMoves(import.Id)
-            .Where(m => m is { Done: true, Undone: false })
-            .Select(m => m.ToPath)
-            .Where(p => Path.GetFileName(Path.GetDirectoryName(p)) == Finalizer.DiscardedFolderName);
+    /// <summary>The moves of sorted-away photos that were actually carried out.</summary>
+    private IEnumerable<string> DiscardedPaths(ImportRecord import)
+    {
+        var discarded = store.GetDiscardedFileIds(import.SessionId);
+        return store.GetMoves(import.Id)
+            .Where(m => m is { Done: true, Undone: false } && discarded.Contains(m.FileId))
+            .Select(m => m.ToPath);
+    }
 }

@@ -128,12 +128,11 @@ public sealed partial class CopiedScreen(int copied, int alreadyImported, int fa
 }
 
 /// <summary>One saved folder, with a button that opens it in Explorer.</summary>
-public sealed partial class FolderLink(string path, int imageCount, int discardedCount)
+public sealed partial class FolderLink(string path, int imageCount)
 {
     public string Path { get; } = path;
     public string Name { get; } = System.IO.Path.GetFileName(path);
-    public string CountText { get; } = $"{imageCount:N0} {(imageCount == 1 ? "bilde" : "bilder")}" +
-                                       (discardedCount > 0 ? $", {discardedCount:N0} sortert bort" : "");
+    public string CountText { get; } = $"{imageCount:N0} {(imageCount == 1 ? "bilde" : "bilder")}";
     public bool Exists { get; } = Directory.Exists(path);
     public bool Missing => !Exists;
 
@@ -146,19 +145,18 @@ public sealed partial class DoneScreen : Screen
     public override int Step => FlowStep.Erase;
 
     public DoneScreen(IReadOnlyList<FolderLink> folders, int savedCount, int discardedCount, int eraseCount,
-        string? eraseRefusal, bool canUndo, bool discardedToRecycleBin, Func<Task> erase, Func<Task> undo)
+        string? eraseRefusal, bool canUndo, Func<Task> erase, Func<Task> undo)
     {
-        DiscardedText = discardedCount == 0 ? null
-            : $"{discardedCount:N0} {(discardedCount == 1 ? "bilde" : "bilder")} er sortert bort. " +
-              $"De ligger i undermappen «{EasyImageImporter.Core.Import.Finalizer.DiscardedFolderName}»" +
-              (discardedToRecycleBin
-                  ? ", og flyttes til papirkurven i morgen. Der kan du fortsatt hente dem tilbake."
-                  : ", og er ikke slettet.");
+        // Where the sorted-away photos are kept is deliberately not the story here.
+        DiscardedText = discardedCount == 0 || folders.Count == 0 ? null
+            : $"{discardedCount:N0} {(discardedCount == 1 ? "bilde" : "bilder")} ble sortert bort.";
         Erase = new Confirmation(erase);
         Undo = new Confirmation(undo);
         CanUndo = canUndo;
         Folders = folders;
-        Title = folders.Count == 0
+        Title = folders.Count == 0 && discardedCount > 0
+            ? discardedCount == 1 ? "Bildet er sortert bort." : $"Alle {discardedCount:N0} bildene er sortert bort."
+            : folders.Count == 0
             ? "Alle bildene på kortet var lagret fra før."
             : $"{savedCount:N0} {(savedCount == 1 ? "bilde er" : "bilder er")} lagret.";
         FoldersText = folders.Count == 1 ? "Du finner dem i denne mappen:" : $"Du finner dem i disse {folders.Count} mappene:";
@@ -200,20 +198,39 @@ public sealed partial class ImportsScreen(IReadOnlyList<ImportRow> rows, Action 
 /// <summary>One import (one card): its folders, one per place, and a way back for the first day.</summary>
 public sealed partial class ImportRow : ObservableObject
 {
-    public ImportRow(IReadOnlyList<FolderLink> folders, DateTime createdUtc, bool canUndo, Func<Task> undo)
+    public ImportRow(IReadOnlyList<FolderLink> folders, DiscardedLink? discarded, DateTime createdUtc, bool canUndo,
+        Func<Task> undo)
     {
         Undo = new Confirmation(undo);
         Folders = folders;
+        Discarded = discarded;
+        NothingKept = folders.Count == 0;
         Details = $"Lagret {createdUtc.ToLocalTime():d. MMMM yyyy 'kl.' HH:mm}";
         CanUndo = canUndo;
-        UndoText = folders.Count > 1
+        UndoText = folders.Count == 0
+            ? "Angre denne importen? Du kommer tilbake til gjennomgangen, og kan velge på nytt. Ingen bilder blir slettet."
+            : folders.Count > 1
             ? $"Angre hele importen? Bildene i alle {folders.Count} mappene flyttes tilbake, og du kan lagre dem på nytt. Ingen bilder blir slettet."
             : "Angre denne importen? Bildene flyttes tilbake fra mappen, og du kan lagre dem på nytt. Ingen bilder blir slettet.";
     }
 
     public IReadOnlyList<FolderLink> Folders { get; }
+    public DiscardedLink? Discarded { get; }
+    public bool HasDiscarded => Discarded is not null;
+
+    /// <summary>Everything on the card was sorted away: no folder to show.</summary>
+    public bool NothingKept { get; }
     public string Details { get; }
     public bool CanUndo { get; }
     public string UndoText { get; }
     public Confirmation Undo { get; }
+}
+
+/// <summary>The photos an import sorted away, while they are still kept: "620 bilder sortert bort, til 28. oktober".</summary>
+public sealed partial class DiscardedLink(string text, string folder)
+{
+    public string Text { get; } = text;
+
+    [RelayCommand]
+    private void Open() => Platform.OpenFolder(folder);
 }

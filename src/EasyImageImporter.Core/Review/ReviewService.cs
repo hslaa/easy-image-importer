@@ -27,12 +27,13 @@ public sealed record Place(long Id, PlaceDetails Details, IReadOnlyList<Visit> V
     public DateTime Start => Visits[0].Start;
     public DateTime End => Visits[^1].End;
     public int ImageCount => Visits.Sum(v => v.Frames.Count);
+    public int KeptCount => Visits.Sum(v => v.KeptCount);
 
-    /// <summary>Animals labelled in the visits, most photographed first.</summary>
+    /// <summary>Animals labelled in the visits kept, most photographed first. What was sorted away doesn't count.</summary>
     public IReadOnlyList<string> Animals => Visits
-        .Where(v => v.Label is not null)
+        .Where(v => v.Label is not null && v.KeptCount > 0)
         .GroupBy(v => v.Label!, StringComparer.OrdinalIgnoreCase)
-        .OrderByDescending(g => g.Sum(v => v.Frames.Count))
+        .OrderByDescending(g => g.Sum(v => v.KeptCount))
         .Select(g => g.First().Label!)
         .ToList();
 
@@ -179,6 +180,9 @@ public sealed class ReviewService(ImportStore store, AppPaths paths)
 
     public void SetKeep(Visit visit, bool keep) => store.SetKeep(visit.Frames.Select(f => f.Id), keep);
 
+    /// <summary>"Sorter bort alle" / "Behold alle" for a whole selection of visits, in one go.</summary>
+    public void SetKeep(IEnumerable<Visit> visits, bool keep) => store.SetKeep(visits.SelectMany(v => v.Frames).Select(f => f.Id), keep);
+
     /// <summary>Splits the visit so that <paramref name="firstOfNew"/> and everything after it becomes a new visit.</summary>
     public void Split(Visit visit, long firstOfNew)
     {
@@ -207,8 +211,11 @@ public sealed class ReviewService(ImportStore store, AppPaths paths)
 
     public IReadOnlyList<string> TagSuggestions() => store.GetVocabulary("tag");
 
-    /// <summary>Everything needed before saving: every place has a name.</summary>
-    public bool IsReadyToSave(long sessionId) => GetOverview(sessionId).Places.All(p => p.IsNamed);
+    /// <summary>The places that get a folder, and so need a name: those with something kept.</summary>
+    public static IReadOnlyList<Place> PlacesToName(ReviewOverview overview) => overview.Places.Where(p => p.KeptCount > 0).ToList();
+
+    /// <summary>Everything needed before saving: every place with photos to keep has a name.</summary>
+    public bool IsReadyToSave(long sessionId) => PlacesToName(GetOverview(sessionId)).All(p => p.IsNamed);
 
     /// <summary>"Nytt sted fra denne bildeserien": this visit and the later ones at its place become a new place.</summary>
     public void StartNewPlace(Place place, Visit from)

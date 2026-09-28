@@ -122,7 +122,7 @@ public sealed class ReviewTests : IDisposable
     }
 
     [Fact]
-    public void Discarded_images_are_saved_to_sortert_bort_not_deleted()
+    public void Discarded_images_are_kept_out_of_sight_not_deleted()
     {
         AddTwoVisits();
         var session = _env.CopyAndPrepare();
@@ -136,12 +136,71 @@ public sealed class ReviewTests : IDisposable
         Assert.Equal(3, import.ImageCount); // 1 from the burst + the 2 fox frames
         Assert.Equal(4, import.DiscardedCount);
         Assert.Equal(3, Directory.GetFiles(import.FolderPath, "*.JPG").Length);
-        var discarded = Path.Combine(import.FolderPath, Finalizer.DiscardedFolderName);
+        // Not among the photos kept, and not mentioned there: out of sight, in the app's own folder.
+        Assert.Empty(Directory.GetDirectories(import.FolderPath));
+        Assert.DoesNotContain("Sortert bort", File.ReadAllText(Path.Combine(import.FolderPath, Finalizer.SummaryFileName)));
+        var discarded = Assert.Single(Directory.GetDirectories(_env.Paths.DiscardedRoot));
         Assert.Equal(4, Directory.GetFiles(discarded).Length);
-        Assert.Contains("Sortert bort: 4 bilder", File.ReadAllText(Path.Combine(import.FolderPath, Finalizer.SummaryFileName)));
 
         // Discarded images are safely stored too, so the card can be erased.
         Assert.Equal(7, _env.Eraser.Evaluate(session.Id).Count);
+    }
+
+    [Fact]
+    public void A_card_where_everything_is_sorted_away_leaves_nothing_in_pictures()
+    {
+        AddTwoVisits();
+        var session = _env.CopyAndPrepare();
+        var review = _env.Review;
+        review.SetKeep(review.GetOverview(session.Id).Visits, keep: false); // "Sorter bort alle bildene"
+
+        // Nothing to name: no place gets a folder.
+        Assert.Empty(ReviewService.PlacesToName(review.GetOverview(session.Id)));
+        Assert.True(review.IsReadyToSave(session.Id));
+
+        var import = _env.Finalizer.Run(session.Id)!;
+
+        Assert.Equal(0, import.ImageCount);
+        Assert.Equal(7, import.DiscardedCount);
+        Assert.Empty(_env.Store.GetImportFolders(import.Id));
+        Assert.Empty(_env.ArchivedImages());
+        Assert.False(Directory.Exists(_env.Paths.ArchiveRoot));
+        Assert.Equal(7, Directory.GetFiles(_env.Paths.DiscardedRoot, "*", SearchOption.AllDirectories).Length);
+        Assert.Equal(7, _env.Eraser.Evaluate(session.Id).Count); // safely stored, so the card can be emptied
+
+        // And it can be undone like any other import, without leaving empty folders behind.
+        _env.Undo.Run(import.Id);
+        Assert.Equal(7, _env.Store.GetStagedFiles(session.Id).Count(f => File.Exists(_env.Review.StagedPath(f))));
+        Assert.Empty(Directory.GetDirectories(_env.Paths.DiscardedRoot));
+    }
+
+    [Fact]
+    public void Only_places_with_something_kept_need_a_name()
+    {
+        AddTwoVisits();
+        var session = _env.CopyAndPrepare();
+        var review = _env.Review;
+        var place = review.GetOverview(session.Id).Places.Single();
+        Assert.False(review.IsReadyToSave(session.Id));
+
+        review.SetKeep(place.Visits, keep: false);
+        Assert.True(review.IsReadyToSave(session.Id));
+    }
+
+    [Fact]
+    public void Animals_sorted_away_are_left_out_of_the_folder_name()
+    {
+        AddTwoVisits();
+        var session = _env.CopyAndPrepare();
+        var review = _env.Review;
+        var visits = review.GetOverview(session.Id).Visits;
+        review.SetLabel(visits[0], "Nøtteskrike");
+        review.SetLabel(visits[1], "Kongeørn");
+        review.SetKeep(visits[0], keep: false); // every nøtteskrike, sorted away
+
+        var place = review.GetOverview(session.Id).Places.Single();
+        Assert.Equal(["Kongeørn"], place.Animals);
+        Assert.DoesNotContain("Nøtteskrike", place.SuggestedFolderName);
     }
 
     [Fact]

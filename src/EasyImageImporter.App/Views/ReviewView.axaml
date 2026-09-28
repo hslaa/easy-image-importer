@@ -13,7 +13,7 @@
             </StackPanel>
             <Button Grid.Column="1" Classes="primary" Command="{Binding NextCommand}" VerticalAlignment="Center" Margin="16,0,0,0">
                 <StackPanel Orientation="Horizontal" Spacing="10">
-                    <TextBlock Text="Neste: navn og merking" />
+                    <TextBlock Text="{Binding NextText}" />
                     <Path Classes="icon" Data="{StaticResource IconForward}" />
                 </StackPanel>
             </Button>
@@ -87,12 +87,17 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
 
-                    <WrapPanel IsVisible="{Binding FilterText, Converter={x:Static ObjectConverters.IsNotNull}}">
-                        <TextBlock Classes="small muted" Text="{Binding FilterText}" VerticalAlignment="Center" Margin="0,0,16,0" />
-                        <Button Content="{Binding DiscardShownText}" Command="{Binding DiscardShownCommand}"
-                                IsVisible="{Binding CanDiscardShown}" />
-                    </WrapPanel>
                 </StackPanel>
+
+                <!-- For everything the filter shows, the whole card with "Alle": often nothing is worth keeping. -->
+                <WrapPanel>
+                    <TextBlock Classes="small muted" Text="{Binding FilterText}" VerticalAlignment="Center" Margin="0,0,16,8"
+                               IsVisible="{Binding FilterText, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                    <Button Content="{Binding DiscardShownText}" Command="{Binding DiscardShownCommand}"
+                            IsVisible="{Binding CanDiscardShown}" Margin="0,0,12,8" />
+                    <Button Classes="link" FontSize="15" Content="{Binding KeepShownText}" Command="{Binding KeepShownCommand}"
+                            IsVisible="{Binding CanKeepShown}" Margin="0,0,0,8" VerticalAlignment="Center" />
+                </WrapPanel>
 
                 <!-- Rows of three, virtualized: only the rows on screen are created. -->
                 <ItemsControl ItemsSource="{Binding Rows}" Margin="0,4,0,0">
