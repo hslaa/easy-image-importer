@@ -28,7 +28,7 @@ The images are irreplaceable when the right bird is in frame.
 Everything else in this spec is negotiable. This isn't. Two hard invariants:
 
 1. **The erase action does not exist** until all files from this session are copied and hash-verified. Not greyed out — absent. It appears only when verification passes 100%.
-2. **"Discard" never means delete.** Discarded images are moved to a `Sortert bort` subfolder inside the same import folder, where he can find and recover them.
+2. **"Discard" never means delete.** Discarded images are moved out of sight, to a `Sortert bort` folder in the app's own data folder, and kept there for 30 days (changeable in settings) before they go to the recycle bin. Recoverable all along, but not part of the normal flow: he doesn't want to keep what he sorted away, and a visible safety net only confused him.
 
 ## 3. User flow
 
@@ -79,6 +79,8 @@ Empty-frame detection alone probably halves his review time.
 ### Step 5 — Select what to keep
 
 - Default is **keep everything**. He actively discards; he never has to actively rescue.
+- **Often nothing on a card is worth keeping** (he is after specific birds, gladly raptors, and 1 000 frames may hold none). Sorting everything away is one click, and with nothing kept the naming step is skipped: straight on to emptying the card.
+- For whatever a filter chip shows (every `Nøtteskrike`, every `Tom`, or the whole card): sort all away / keep all, in one go. Single visits can still be changed afterwards.
 - Per sequence: keep all / discard all / open and pick individual frames.
 - **"Foreslå beste bilder"** — picks the sharpest, best-composed frames from a long burst, so keeping 5 of 203 is two clicks.
 - Discarded ≠ deleted (see invariant 2).
@@ -102,7 +104,6 @@ Bilder\Viltkamera\2026\2026-09-18 Høgfjellåsen\
     2026-09-18_Høgfjellåsen_0712_Nøtteskrike_001.jpg
     2026-09-18_Høgfjellåsen_0712_Nøtteskrike_002.jpg
     ...
-    Sortert bort\
     OM DENNE MAPPEN.txt
 ```
 
@@ -169,7 +170,7 @@ Only now does the erase step appear:
 ## 7. Open questions for the user
 
 1. Should species detection auto-tag, or only suggest and let him confirm?
-2. Should discarded images be kept forever, or cleaned up after N months with a warning?
+2. ~~Should discarded images be kept forever, or cleaned up after N months with a warning?~~ Kept out of sight for 30 days, then the recycle bin.
 3. How many camera models, and which ones?
 4. Does he ever reposition a camera slightly within the same site?
 5. Does he already have an existing folder structure of past imports we should respect or migrate?
@@ -195,5 +196,5 @@ Ship 1–2 to him early and let real use shape the rest.
 
 - **Sted** — a camera placement. One physical spot, camera stationary. E.g. *Høgfjellåsen*.
 - **Hendelse** (shown as «bildeserie» in the app) — one animal visit; a burst of images close in time at one site.
-- **Sortert bort** — the folder holding images he chose not to keep. Recoverable, never auto-deleted.
+- **Sortert bort** — images he chose not to keep. Held out of sight in the app's data folder for 30 days, then put in the recycle bin. Only places with something kept get a folder in `Bilder\Viltkamera`.
 - **Staging** — the app's internal verified copy of the card contents, before he decides what to keep.

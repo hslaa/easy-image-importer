@@ -49,7 +49,7 @@ internal static class Rows
 public sealed partial class ReviewScreen(
     ReviewOverview overview, IReadOnlyList<object> rows, IReadOnlyList<FilterChip> filters, string? filterText,
     AnimalRecognition recognition, string? alreadyImportedText, string? failedText, Action next, Func<Task> retryFailed,
-    Action? discardShown = null) : Screen
+    Action<bool> setShownKeep) : Screen
 {
     private ReviewOverview _overview = overview;
 
@@ -66,14 +66,14 @@ public sealed partial class ReviewScreen(
     public bool HasFilters => Filters.Count > 1;
 
     /// <summary>A choice was made on a card: new counts, but the list itself stays where it is.</summary>
-    public void Changed(ReviewOverview overview, IReadOnlyList<FilterChip> filters, int shownToDiscard)
+    public void Changed(ReviewOverview overview, IReadOnlyList<FilterChip> filters, IReadOnlyList<Visit> shown)
     {
         _overview = overview;
         Filters = filters;
-        _shownToDiscard = shownToDiscard;
-        OnPropertyChanged(nameof(Summary));
-        OnPropertyChanged(nameof(DiscardShownText));
-        OnPropertyChanged(nameof(CanDiscardShown));
+        _shown = shown;
+        foreach (var name in new[] { nameof(Summary), nameof(NextText), nameof(DiscardShownText), nameof(CanDiscardShown),
+                     nameof(KeepShownText), nameof(CanKeepShown) })
+            OnPropertyChanged(name);
     }
 
     /// <summary>"Viser 12 av 60 bildeserier" while a filter is on.</summary>
@@ -86,7 +86,12 @@ public sealed partial class ReviewScreen(
         $"{(_overview.Visits.Count == 1 ? "bildeserie" : "bildeserier")}" +
         (_overview.Places.Count > 1 ? $" på {_overview.Places.Count:N0} steder." : ".") +
         (_overview.KeptCount == _overview.ImageCount ? ""
+            : _overview.KeptCount == 0 ? " Alle sorteres bort."
             : $" {_overview.ImageCount - _overview.KeptCount:N0} av dem sorteres bort.");
+
+    /// <summary>With nothing kept there is nothing to name: straight on to emptying the card.</summary>
+    public string NextText => _overview.Places.Any(p => p.KeptCount > 0) ? "Neste: navn og merking"
+        : _overview.Videos.Count > 0 ? "Neste: lagre" : "Neste: tøm kortet";
 
     /// <summary>Things worth knowing, but nothing to do: skipped duplicates and videos.</summary>
     public string? NoteText { get; } = string.Join(" ", new[]
@@ -102,15 +107,26 @@ public sealed partial class ReviewScreen(
 
     public string? FailedText { get; } = failedText;
 
-    /// <summary>With "Tomme" chosen: sort away every visit shown, in one go (still the user's choice).</summary>
-    private int _shownToDiscard;
-    public bool CanDiscardShown => discardShown is not null && _shownToDiscard > 0;
-    public string DiscardShownText => _shownToDiscard == 1
-        ? "Sorter bort den tomme bildeserien"
-        : $"Sorter bort alle {_shownToDiscard:N0} tomme bildeserier";
+    /// <summary>
+    /// What the chosen filter shows: every visit with "Alle". Often nothing on a card is worth
+    /// keeping, so sorting all of it away (or every nøtteskrike) is one click.
+    /// </summary>
+    private IReadOnlyList<Visit> _shown = [];
+    private bool IsFiltered => FilterText is not null;
+
+    public bool CanDiscardShown => _shown.Any(v => v.KeptCount > 0);
+    public string DiscardShownText => !IsFiltered ? "Sorter bort alle bildene"
+        : _shown.Count == 1 ? "Sorter bort denne bildeserien"
+        : $"Sorter bort disse {_shown.Count:N0} bildeseriene";
+
+    public bool CanKeepShown => _shown.Any(v => v.KeptCount < v.Frames.Count);
+    public string KeepShownText => !IsFiltered ? "Behold alle" : _shown.Count == 1 ? "Behold den" : "Behold alle disse";
 
     [RelayCommand]
-    private void DiscardShown() => discardShown?.Invoke();
+    private void DiscardShown() => setShownKeep(false);
+
+    [RelayCommand]
+    private void KeepShown() => setShownKeep(true);
 
     /// <summary>On to naming the places; saving happens from there.</summary>
     [RelayCommand]

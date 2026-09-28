@@ -63,8 +63,7 @@ public sealed partial class PlaceForm : ObservableObject
         _place = place;
         _store = store;
         Heading = $"Sted {number}";
-        Details = $"{Rows.DateRangeText(place.Start, place.End)} · {place.Visits.Count:N0} " +
-                  $"{(place.Visits.Count == 1 ? "bildeserie" : "bildeserier")}, {Rows.Count(place.ImageCount)}";
+        Details = $"{Rows.DateRangeText(place.Start, place.End)} · {Rows.Count(place.KeptCount)} beholdes";
         Covers = covers;
         RecognisedText = place.Details.RecognisedName is { } known ? $"Dette ser ut som {known}." : null;
         AnimalsText = place.Animals.Count > 0

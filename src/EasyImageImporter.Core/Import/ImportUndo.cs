@@ -61,8 +61,10 @@ public sealed class ImportUndo(IFileSystem fs, ImportStore store, AppPaths paths
             store.MarkMoveUndone(importId, move.FileId);
         }
 
-        // Our own summaries go; each folder only if nothing else was put in it.
-        var folders = store.GetImportFolders(importId).Select(f => f.FolderPath).DefaultIfEmpty(import.FolderPath);
+        // Our own summaries go; each folder only if nothing else was put in it. An import where
+        // everything was sorted away has no folder at all.
+        var folders = store.GetImportFolders(importId).Select(f => f.FolderPath).ToList();
+        if (folders.Count == 0 && import.FolderPath.Length > 0) folders.Add(import.FolderPath);
         foreach (var folder in folders)
         {
             var summary = Path.Combine(folder, Finalizer.SummaryFileName);
@@ -71,6 +73,11 @@ public sealed class ImportUndo(IFileSystem fs, ImportStore store, AppPaths paths
             if (fs.DeleteDirectoryIfEmpty(folder))
                 fs.DeleteDirectoryIfEmpty(Path.GetDirectoryName(folder)!); // the year folder
         }
+
+        foreach (var folder in store.GetMoves(importId).Select(m => Path.GetDirectoryName(m.ToPath)!)
+                     .Where(d => d.StartsWith(paths.DiscardedRoot, StringComparison.OrdinalIgnoreCase))
+                     .Distinct(StringComparer.OrdinalIgnoreCase))
+            fs.DeleteDirectoryIfEmpty(folder);
 
         store.ForgetSessionScenes(session.Id);
         store.CompleteUndo(importId, session.Id);

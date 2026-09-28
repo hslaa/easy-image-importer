@@ -101,7 +101,7 @@ Failure handling:
 
 ### 2.5 "Discard never means delete"
 
-There is no code path that calls `File.Delete` on a user image except (a) removing a verified staging duplicate after it has been verified at its final location, and (b) the gated card erase. Both go through one small, heavily tested `SafeDelete` service that requires the hash of a verified copy elsewhere. Discarded images are *moved* to `Sortert bort\`.
+There is no code path that calls `File.Delete` on a user image except (a) removing a verified staging duplicate after it has been verified at its final location, and (b) the gated card erase. Both go through one small, heavily tested `SafeDelete` service that requires the hash of a verified copy elsewhere. Discarded images are *moved* to `<data>\Sortert bort\<place>\` (next to staging, so it is a rename), and after the retention period (30 days by default) moved to the recycle bin, never deleted by the app.
 
 ### 2.6 Erase gate
 

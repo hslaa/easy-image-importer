@@ -15,4 +15,10 @@ public sealed class AppPaths(string dataRoot, string archiveRoot)
     public string DatabasePath => Path.Combine(DataRoot, "easyimageimporter.db");
     public string StagingRoot => Path.Combine(DataRoot, "staging");
     public string StagingDir(long sessionId) => Path.Combine(StagingRoot, sessionId.ToString());
+
+    /// <summary>
+    /// Photos the user sorted away, one folder per place, out of sight of the saved photos. Next to
+    /// staging on purpose: moving them here is a rename, however many there are.
+    /// </summary>
+    public string DiscardedRoot => Path.Combine(DataRoot, Finalizer.DiscardedFolderName);
 }

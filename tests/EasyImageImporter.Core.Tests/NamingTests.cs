@@ -102,7 +102,8 @@ public sealed class SavingWithPlacesTests : IDisposable
         Assert.Matches(@"^2026-06-03_Høgfjellåsen_\d{4}_Kongeørn_001\.jpg$", first[0]);
 
         Assert.Equal(4, Directory.GetFiles(folders[1].FolderPath, "*.jpg").Length);
-        Assert.Equal(4, Directory.GetFiles(Path.Combine(folders[1].FolderPath, Finalizer.DiscardedFolderName)).Length);
+        Assert.False(Directory.Exists(Path.Combine(folders[1].FolderPath, Finalizer.DiscardedFolderName)));
+        Assert.Equal(4, Directory.GetFiles(_env.Paths.DiscardedRoot, "*", SearchOption.AllDirectories).Length);
 
         var summary = File.ReadAllText(Path.Combine(folders[0].FolderPath, Finalizer.SummaryFileName));
         Assert.Contains("Høgfjellåsen", summary);

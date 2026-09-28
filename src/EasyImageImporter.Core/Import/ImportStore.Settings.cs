@@ -22,6 +22,20 @@ public sealed partial class ImportStore
     public IReadOnlyList<ImportRecord> GetImportsWithDiscarded() =>
         QueryImports("WHERE undone_utc IS NULL AND discarded_cleared_utc IS NULL AND discarded_count > 0 ORDER BY created_utc");
 
+    /// <summary>
+    /// The files of a session the user sorted away. What decides it, not where they ended up:
+    /// imports saved by earlier versions keep them in a "Sortert bort" folder next to the photos kept.
+    /// </summary>
+    public IReadOnlySet<long> GetDiscardedFileIds(long sessionId)
+    {
+        using var c = db.Open();
+        using var cmd = Command(c, null, "SELECT id FROM session_files WHERE session_id = $s AND keep = 0;", ("$s", sessionId));
+        var result = new HashSet<long>();
+        using var r = cmd.ExecuteReader();
+        while (r.Read()) result.Add(r.GetInt64(0));
+        return result;
+    }
+
     public void MarkDiscardedCleared(long importId) =>
         Execute("UPDATE imports SET discarded_cleared_utc = $t WHERE id = $i;", ("$t", Now()), ("$i", importId));
 }

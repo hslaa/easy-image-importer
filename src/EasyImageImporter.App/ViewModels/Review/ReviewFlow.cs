@@ -66,17 +66,34 @@ public sealed class ReviewFlow
         var overview = review.GetOverview(sessionId);
         foreach (var visit in overview.Visits)
             if (_cards.TryGetValue(visit.Id, out var card)) card.Update(visit);
-        _overview.Changed(overview, Filters(overview), EmptyToDiscard(overview).Count);
+        _overview.Changed(overview, Filters(overview), Shown(overview));
     }
 
-    /// <summary>With "Tomme" chosen: the empty-looking visits on screen that are still kept.</summary>
-    private List<Visit> EmptyToDiscard(ReviewOverview overview) => _filter != EmptyFilter ? []
-        : overview.Visits.Where(v => _cards.ContainsKey(v.Id) && v.KeptCount > 0).ToList();
+    private bool IsShown(Visit v) => _filter == AllFilter || FilterOf(v) == _filter;
 
-    private void DiscardShown()
+    /// <summary>The visits the chosen filter shows: all of them with "Alle".</summary>
+    private List<Visit> Shown(ReviewOverview overview) => overview.Visits.Where(IsShown).ToList();
+
+    /// <summary>
+    /// "Sorter bort alle" / "Behold alle" for what the filter shows: every nøtteskrike, every empty
+    /// frame, or the whole card. Still the user's choice, one visit at a time can be changed after.
+    /// </summary>
+    private void SetShownKeep(bool keep)
     {
-        foreach (var visit in EmptyToDiscard(review.GetOverview(sessionId))) review.SetKeep(visit, false);
+        review.SetKeep(Shown(review.GetOverview(sessionId)), keep);
         Refresh();
+    }
+
+    /// <summary>On from the review: name the places with photos to keep, or, with nothing kept, save straight away.</summary>
+    private void Next()
+    {
+        if (ReviewService.PlacesToName(review.GetOverview(sessionId)).Count > 0)
+        {
+            ShowNaming();
+            return;
+        }
+        _overview = null;
+        _ = save();
     }
 
     private IReadOnlyList<FilterChip> Filters(ReviewOverview overview)
@@ -106,7 +123,6 @@ public sealed class ReviewFlow
         var counts = store.GetCounts(sessionId);
         var filters = Filters(overview);
         if (!filters.Any(f => f.IsSelected)) _filter = AllFilter;
-        bool Shown(Visit v) => _filter == AllFilter || FilterOf(v) == _filter;
 
         var rows = new List<object>();
         var number = 0;
@@ -119,7 +135,7 @@ public sealed class ReviewFlow
             foreach (var visit in place.Visits)
             {
                 ++number;
-                if (!Shown(visit)) continue;
+                if (!IsShown(visit)) continue;
                 var card = new VisitCard(visit, number, Thumb(visit.Cover), OpenVisit, SetVisitKeep, Accept, Dismiss);
                 _cards[visit.Id] = card;
                 cards.Add(card);
@@ -133,7 +149,7 @@ public sealed class ReviewFlow
             rows.AddRange(Rows.Of(cards, 3, items => new VisitRow(items)));
         }
 
-        var shownCount = overview.Visits.Count(Shown);
+        var shownCount = overview.Visits.Count(IsShown);
         var screen = new ReviewScreen(overview, rows, filters,
             _filter == AllFilter ? null : $"Viser {shownCount:N0} av {overview.Visits.Count:N0} bildeserier.",
             recognition,
@@ -141,10 +157,9 @@ public sealed class ReviewFlow
                 : $"{counts.Duplicate:N0} av bildene var importert fra før og blir hoppet over.",
             failedText: counts.Failed == 0 ? null
                 : $"{counts.Failed:N0} {(counts.Failed == 1 ? "bilde" : "bilder")} kunne ikke kopieres trygt. Kortet vil ikke bli slettet før dette er løst.",
-            ShowNaming, retryFailed,
-            discardShown: _filter == EmptyFilter ? DiscardShown : null);
+            Next, retryFailed, SetShownKeep);
         _overview = screen;
-        screen.Changed(overview, filters, EmptyToDiscard(overview).Count);
+        screen.Changed(overview, filters, Shown(overview));
         show(screen);
     }
 
@@ -165,7 +180,7 @@ public sealed class ReviewFlow
     {
         var overview = review.GetOverview(sessionId);
         var tags = review.TagSuggestions();
-        var forms = overview.Places.Select((place, i) => new PlaceForm(place, i + 1,
+        var forms = ReviewService.PlacesToName(overview).Select((place, i) => new PlaceForm(place, i + 1,
             ReviewService.SampleFrames(place.Visits, 4).Select(v => Thumb(v.Cover)).ToList(), store, tags)).ToList();
         _overview = null;
         show(new NamingScreen(forms, back: ShowOverview, save));

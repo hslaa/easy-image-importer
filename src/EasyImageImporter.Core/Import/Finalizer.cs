@@ -10,9 +10,10 @@ namespace EasyImageImporter.Core.Import;
 public readonly record struct SaveProgress(int Done, int Total);
 
 /// <summary>
-/// Saves an import: one folder per place, <c>Viltkamera\2026\Høgfjellåsen Juni 2026 – Kongeørn\</c>,
-/// files named <c>2026-06-03_Høgfjellåsen_0712_Kongeørn_001.jpg</c>, sorted-away photos in
-/// <c>Sortert bort\</c>, a plain-text summary per folder, and tags Windows Explorer can search.
+/// Saves an import: one folder per place with photos to keep, <c>Viltkamera\2026\Høgfjellåsen Juni 2026 – Kongeørn\</c>,
+/// files named <c>2026-06-03_Høgfjellåsen_0712_Kongeørn_001.jpg</c>, a plain-text summary per folder,
+/// and tags Windows Explorer can search. Sorted-away photos go out of sight, to
+/// <see cref="AppPaths.DiscardedRoot"/>, until <see cref="DiscardedCleanup"/> puts them in the bin.
 ///
 /// The whole move plan is written to the database before the first file moves, so a crash halfway
 /// is finished by simply running <see cref="Run"/> again; every later step is safe to repeat.
@@ -22,7 +23,7 @@ public sealed class Finalizer(
 {
     public const string SummaryFileName = "OM DENNE MAPPEN.txt";
 
-    /// <summary>Where discarded images go: inside the import, so they can always be found again.</summary>
+    /// <summary>The folder discarded images are kept in for a while (see <see cref="AppPaths.DiscardedRoot"/>).</summary>
     public const string DiscardedFolderName = "Sortert bort";
 
     /// <summary>Scenes remembered per place per import, for recognising it next season.</summary>
@@ -52,7 +53,9 @@ public sealed class Finalizer(
         }
 
         var moves = store.GetMoves(import.Id);
-        var total = moves.Count * (exifTool is null ? 1 : 2);
+        // Only the photos kept are tagged: sorted-away ones are never looked at again.
+        var discarded = store.GetDiscardedFileIds(sessionId);
+        var total = moves.Count + (exifTool is null ? 0 : moves.Count(m => !discarded.Contains(m.FileId)));
         var done = moves.Count(m => m.Done);
         foreach (var move in moves.Where(m => !m.Done))
         {
@@ -62,7 +65,7 @@ public sealed class Finalizer(
         }
 
         var overview = _review.GetOverview(sessionId);
-        WriteMetadata(moves, overview, progress, done, total);
+        WriteMetadata(moves.Where(m => !discarded.Contains(m.FileId)).ToList(), overview, progress, done, total);
         foreach (var folder in store.GetImportFolders(import.Id)) WriteSummary(import, folder, overview);
 
         store.CompleteImport(import.Id, sessionId);
@@ -92,47 +95,58 @@ public sealed class Finalizer(
             placeOf[frame.Id] = (place, visit);
 
         var moves = new List<(long FileId, string From, string To)>();
-        var folders = new List<ImportFolder>();
         var plannedFolders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var takenNames = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
 
-        string FolderFor(string name, DateTime start)
+        string Reserve(string path)
         {
-            var year = (start.Year >= 2010 ? start.Year : _time.GetLocalNow().Year).ToString(CultureInfo.InvariantCulture);
-            var path = UniquePath(Path.Combine(paths.ArchiveRoot, year, name),
-                p => fs.DirectoryExists(p) || plannedFolders.Contains(p));
+            path = UniquePath(path, p => fs.DirectoryExists(p) || plannedFolders.Contains(p));
             plannedFolders.Add(path);
             return path;
         }
 
-        void Add(SessionFile file, string folder, string name)
+        string FolderFor(string name, DateTime start)
         {
-            var dir = file.Keep ? folder : Path.Combine(folder, DiscardedFolderName);
+            var year = (start.Year >= 2010 ? start.Year : _time.GetLocalNow().Year).ToString(CultureInfo.InvariantCulture);
+            return Reserve(Path.Combine(paths.ArchiveRoot, year, name));
+        }
+
+        void Add(SessionFile file, string dir, string name)
+        {
             if (!takenNames.TryGetValue(dir, out var taken)) takenNames[dir] = taken = [];
             moves.Add((file.Id, Path.Combine(paths.StagingDir(session.Id), file.StagingName!),
                 Path.Combine(dir, UniqueName(name, taken))));
         }
 
+        // A place gets a folder among the saved photos only if something there is kept: a card
+        // where everything was sorted away leaves nothing behind in Pictures.
+        var folderOf = new Dictionary<long, string>();
+        var folders = new List<ImportFolder>();
         foreach (var place in overview.Places)
         {
-            var folder = FolderFor(place.FolderName, place.Start);
+            var kept = place.Visits.Sum(v => v.KeptCount);
+            string? folder = null, discarded = null;
+            if (kept > 0) folderOf[place.Id] = folder = FolderFor(place.FolderName, place.Start);
             foreach (var visit in place.Visits)
                 for (var i = 0; i < visit.Frames.Count; i++)
-                    Add(visit.Frames[i], folder,
-                        Names.FileName(visit.Start, place.Name, visit.Label, i + 1, Path.GetExtension(visit.Frames[i].RelPath)));
-            folders.Add(new ImportFolder(0, folder,
-                place.Visits.Sum(v => v.KeptCount), place.ImageCount - place.Visits.Sum(v => v.KeptCount), place.Id));
+                {
+                    var frame = visit.Frames[i];
+                    var dir = frame.Keep ? folder! : discarded ??= Reserve(Path.Combine(paths.DiscardedRoot, place.FolderName));
+                    Add(frame, dir, Names.FileName(visit.Start, place.Name, visit.Label, i + 1, Path.GetExtension(frame.RelPath)));
+                }
+            if (folder is not null) folders.Add(new ImportFolder(0, folder, kept, place.ImageCount - kept, place.Id));
         }
 
         // Videos (and anything not in a visit) go with the place they were filmed nearest in time to.
         var rest = files.Where(f => !placeOf.ContainsKey(f.Id)).ToList();
         if (rest.Count > 0)
         {
+            var withFolder = overview.Places.Where(p => folderOf.ContainsKey(p.Id)).ToList();
             string? fallback = null;
             foreach (var file in rest.OrderBy(f => f.TakenAt).ThenBy(f => f.RelPath, StringComparer.Ordinal))
             {
                 var taken = file.TakenAt ?? file.MtimeUtc.ToLocalTime();
-                var place = overview.Places.MinBy(p => taken < p.Start ? p.Start - taken : taken > p.End ? taken - p.End : TimeSpan.Zero);
+                var place = withFolder.MinBy(p => taken < p.Start ? p.Start - taken : taken > p.End ? taken - p.End : TimeSpan.Zero);
                 string folder, placeName;
                 if (place is null)
                 {
@@ -141,7 +155,7 @@ public sealed class Finalizer(
                 }
                 else
                 {
-                    folder = folders.First(f => f.PlaceId == place.Id).FolderPath;
+                    folder = folderOf[place.Id];
                     placeName = place.Name;
                 }
                 Add(file, folder, Names.FileName(taken, placeName, null, 1, Path.GetExtension(file.RelPath)));
@@ -152,7 +166,8 @@ public sealed class Finalizer(
             }
         }
 
-        var import = store.CreateImportPlan(session.Id, folders[0].FolderPath, moves,
+        // Nothing kept at all: an import without a folder, known only by what was sorted away.
+        var import = store.CreateImportPlan(session.Id, folders.FirstOrDefault()?.FolderPath ?? "", moves,
             discardedCount: files.Count(f => !f.Keep));
         store.AddImportFolders(import.Id, folders.Select(f => f with { ImportId = import.Id }));
         return import;
@@ -192,9 +207,6 @@ public sealed class Finalizer(
         if (place is not null)
             text.AppendLine(string.Create(Norwegian, $"Tatt:         {place.Start:d. MMMM yyyy} – {place.End:d. MMMM yyyy}"));
         text.AppendLine(string.Create(Norwegian, $"Antall:       {folder.ImageCount:N0} bilder"));
-        if (folder.DiscardedCount > 0)
-            text.AppendLine(string.Create(Norwegian,
-                $"Sortert bort: {folder.DiscardedCount:N0} bilder, i mappen «{DiscardedFolderName}». De er ikke slettet."));
         if (place is not null && place.Animals.Count > 0) text.AppendLine($"Dyr:          {string.Join(", ", place.Animals)}");
         if (place is not null && place.Details.Tags.Count > 0) text.AppendLine($"Stikkord:     {string.Join(", ", place.Details.Tags)}");
         text.AppendLine(string.Create(Norwegian, $"Importert:    {import.CreatedUtc.ToLocalTime():d. MMMM yyyy 'kl.' HH:mm}"));
